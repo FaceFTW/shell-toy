@@ -12,6 +12,8 @@ pub const ILLEGAL_FILE_SUFFIXES: [&str; 13] = [
     "dat", "pos", "c", "h", "p", "i", "f", "pas", "ftn", "ins.c", "ins,pas", "ins.ftn", "sml",
 ];
 
+mod strfile;
+
 //default method of getting a fortune, without using the index file.
 fn get_fortune_no_index(
     fortune_path: &PathBuf,
@@ -50,6 +52,9 @@ fn get_fortune_no_index(
 
     Ok(fortunes[rand_idx].to_string())
 }
+
+
+
 
 fn main() {
     let mut rng = thread_rng();
