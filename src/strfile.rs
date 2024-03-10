@@ -40,7 +40,7 @@ pub struct StrFile {
     pub offsets: Vec<u32>,
 }
 
-fn parse_strfile(file: &PathBuf) -> Result<StrFile, Box<dyn Error>> {
+pub fn parse_strfile(file: &PathBuf) -> Result<StrFile, Box<dyn Error>> {
     let mut datfile = File::open(file)?;
 
     let str_version = datfile.read_u32::<LittleEndian>()?;
@@ -85,6 +85,7 @@ fn parse_strfile(file: &PathBuf) -> Result<StrFile, Box<dyn Error>> {
     Ok(StrFile { header, offsets })
 }
 
-fn choose_fortune_index(offsets_len: usize, rng: &mut impl Rng) -> usize {
-    rng.gen_range(0..offsets_len).into()
+pub fn choose_fortune_offset(offsets: &[u32], rng: &mut impl Rng) -> u32 {
+    let idx: usize = rng.gen_range(0..offsets.len()).into();
+    offsets[idx]
 }

@@ -2,12 +2,15 @@ use std::{
     env::args,
     error::Error,
     fs::{self, metadata, DirEntry, File},
-    io::Read,
+    io::{Read, Seek, SeekFrom},
     path::PathBuf,
     process::exit,
 };
 
 use rand::{seq::SliceRandom, thread_rng, Rng};
+use strfile::StrFile;
+
+use crate::strfile::choose_fortune_offset;
 pub const ILLEGAL_FILE_SUFFIXES: [&str; 13] = [
     "dat", "pos", "c", "h", "p", "i", "f", "pas", "ftn", "ins.c", "ins,pas", "ins.ftn", "sml",
 ];
@@ -53,8 +56,35 @@ fn get_fortune_no_index(
     Ok(fortunes[rand_idx].to_string())
 }
 
+fn get_fortune_using_index(
+    fortune_path: &PathBuf,
+    strfile: &StrFile,
+    rng: &mut impl Rng,
+) -> Result<String, Box<dyn Error>> {
+    let mut file = File::open(fortune_path)?;
 
+    let fortune_offset = choose_fortune_offset(&strfile.offsets.as_slice(), rng);
+    file.seek(SeekFrom::Start(fortune_offset.into()))?;
+    //
+    let mut fortune_string = String::new();
+    let mut char_buf: [u8; 16] = Default::default(); //A fairly reasonable buffer size
+    while let Ok(_) = file.read_exact(&mut char_buf) {
+        let mut short_circuit = false;
+        for char_val in char_buf.map(|val| val as char) {
+            if char_val != strfile.header.delimiting_char {
+                fortune_string.push(char_val);
+            } else {
+                short_circuit = true;
+                break;
+            }
+        }
+        if short_circuit {
+            break;
+        }
+    }
 
+    Ok(fortune_string)
+}
 
 fn main() {
     let mut rng = thread_rng();
@@ -66,6 +96,9 @@ fn main() {
     }
 
     let path = PathBuf::from(argv[1].as_str());
+
+
+
     match get_fortune_no_index(&path, &mut rng) {
         Ok(fortune) => print!("{fortune}"),
         Err(err) => {
