@@ -18,34 +18,31 @@ pub const ILLEGAL_FILE_SUFFIXES: [&str; 13] = [
 mod strfile;
 
 //default method of getting a fortune, without using the index file.
-fn get_fortune_no_index(
-    fortune_path: &PathBuf,
-    rng: &mut impl Rng,
-) -> Result<String, Box<dyn Error>> {
-    let path_metadata = metadata(fortune_path).unwrap();
+fn get_fortune_no_index(file: &mut File, rng: &mut impl Rng) -> Result<String, Box<dyn Error>> {
+    // let path_metadata = metadata(fortune_path).unwrap();
 
-    let mut file: File;
-    if path_metadata.is_dir() {
-        let mut file_list: Vec<DirEntry> = fs::read_dir(fortune_path)?
-            .into_iter()
-            .filter(|read_dir| {
-                return !ILLEGAL_FILE_SUFFIXES.contains(
-                    &read_dir
-                        .as_ref()
-                        .expect("error reading into the directory")
-                        .file_name()
-                        .into_string()
-                        .expect("msg")
-                        .as_str(),
-                );
-            })
-            .map(|val| val.expect("Error"))
-            .collect();
-        file_list.shuffle(rng);
-        file = File::open(file_list.get(0).expect("Should have a 0th element").path())?;
-    } else {
-        file = File::open(fortune_path)?
-    }
+    // let mut file: File;
+    // if path_metadata.is_dir() {
+    //     let mut file_list: Vec<DirEntry> = fs::read_dir(fortune_path)?
+    //         .into_iter()
+    //         .filter(|read_dir| {
+    //             return !ILLEGAL_FILE_SUFFIXES.contains(
+    //                 &read_dir
+    //                     .as_ref()
+    //                     .expect("error reading into the directory")
+    //                     .file_name()
+    //                     .into_string()
+    //                     .expect("msg")
+    //                     .as_str(),
+    //             );
+    //         })
+    //         .map(|val| val.expect("Error"))
+    //         .collect();
+    //     file_list.shuffle(rng);
+    //     file = File::open(file_list.get(0).expect("Should have a 0th element").path())?;
+    // } else {
+    //     file = File::open(fortune_path)?
+    // }
 
     let mut string_buf = String::new();
     let _result = file.read_to_string(&mut string_buf)?;
@@ -57,11 +54,11 @@ fn get_fortune_no_index(
 }
 
 fn get_fortune_using_index(
-    fortune_path: &PathBuf,
+    file: &mut File,
     strfile: &StrFile,
     rng: &mut impl Rng,
 ) -> Result<String, Box<dyn Error>> {
-    let mut file = File::open(fortune_path)?;
+    // let mut file = File::open(fortune_path)?;
 
     let fortune_offset = choose_fortune_offset(&strfile.offsets.as_slice(), rng);
     file.seek(SeekFrom::Start(fortune_offset.into()))?;
@@ -95,15 +92,43 @@ fn main() {
         exit(1);
     }
 
-    let path = PathBuf::from(argv[1].as_str());
+    let fortune_path = PathBuf::from(argv[1].as_str());
+    let path_metadata = metadata(fortune_path).unwrap();
 
-
-
-    match get_fortune_no_index(&path, &mut rng) {
-        Ok(fortune) => print!("{fortune}"),
-        Err(err) => {
-            println!("Error producing a fortune: {err}");
-            exit(1);
-        }
+    let mut file: File;
+    if path_metadata.is_dir() {
+        let mut file_list: Vec<DirEntry> = fs::read_dir(fortune_path)
+            .expect("Path was marked as a directory but could not enumerate it's files!")
+            .into_iter()
+            .filter(|read_dir| {
+                return !ILLEGAL_FILE_SUFFIXES.contains(
+                    &read_dir
+                        .as_ref()
+                        .expect("error reading into the directory")
+                        .file_name()
+                        .into_string()
+                        .expect("msg")
+                        .as_str(),
+                );
+            })
+            .map(|val| val.expect("Error"))
+            .collect();
+        file_list.shuffle(&mut rng);
+        file = File::open(file_list.get(0).expect("Should have a 0th element").path()).expect("Could not open the chosen fortune file in the directory");
+    } else {
+        file = File::open(fortune_path).expect("Could not open the specified file!");
     }
+
+	//check for a strfile
+	// let strfile_path = fortune_path.as_path().a
+
+
+
+    // match get_fortune_no_index(&, &mut rng) {
+    //     Ok(fortune) => print!("{fortune}"),
+    //     Err(err) => {
+    //         println!("Error producing a fortune: {err}");
+    //         exit(1);
+    //     }
+    // }
 }
