@@ -8,13 +8,12 @@
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum TerminalCharacter {
     Space,
-	TerminalEscape()
+    TerminalEscape(),
     TerminalForegroundColor8(u8),
-	TerminalForegroundColor24(u32),
-	TerminalBackgroundColor8(u8),
-	TerminalBackgroundColor24(u32),
-    UnicodeCharacter(Char),
-	ThoughtPlaceholder,
-	Newline
+    TerminalForegroundColor24(u32),
+    TerminalBackgroundColor8(u8),
+    TerminalBackgroundColor24(u32),
+    UnicodeCharacter(char),
+    ThoughtPlaceholder,
+    Newline,
 }
-
