@@ -4,18 +4,54 @@ use strip_ansi_escapes::strip;
 use textwrap::fill;
 use unicode_width::UnicodeWidthStr;
 
-///Holds the representation of the "cows" in a format that we can parse/use
-enum Cowsay {
-    ///From OG perl cowsay
-    Cow {
-        repr: Vec<(char, Option<owo_colors::Style>)>,
-    },
-    ///From charasay
-    Chara { repr: Vec<String> },
-    ///Defines a Cow that is to be interpreted almost "raw"
-    /// except for removing the Perl code/substitutions
-    RawCowsay { repr: String },
+// ///Holds the representation of the "cows" in a format that we can parse/use
+// enum Cowsay {
+//     ///From OG perl cowsay
+//     Cow {
+//         repr: Vec<(char, Option<owo_colors::Style>)>,
+//     },
+//     ///From charasay
+//     Chara { repr: Vec<String> },
+//     ///Defines a Cow that is to be interpreted almost "raw"
+//     /// except for removing the Perl code/substitutions
+//     RawCowsay { repr: String },
+// }
+
+// impl Cowsay{
+pub fn parse_raw_cow(cow_str: &str, is_think: bool) -> String {
+    //This is a really cut and dry method for parsing out the Perl bits
+    //that originally existed in cow files
+    //THIS WILL BREAK IF WE HAVE COWS USING SPECIAL VAR SUBSTITUTION
+    //LIKE THE ONES HERE: https://charc0al.github.io/cowsay-files/converter/
+
+    let thought_char = match is_think {
+        true => 'o',
+        false => '\\',
+    };
+
+    cow_str
+        .replace("$thoughts", thought_char)
+        .replace("$eyes", "o o")
+        .replace("$toungue", "")
+        .split("\n")
+        .fold(String::new(), |acc, x| {
+            //this might be a "preemptive check"
+            let cleaned_str = x.replace("\r", "");
+            match cleaned_str.as_str() {
+                //TODO this is incredibly brute-force
+                "$the_cow = <<\"EOC\";" => acc,
+                "$the_cow= <<\"EOC\";" => acc,
+                "$the_cow=<<\"EOC\";" => acc,
+                "$the_cow =<<\"EOC\";" => acc,
+                "EOC" => acc,
+                "$the_cow = @\"" => acc,
+                "\"@" => acc,
+                _ if &cleaned_str.starts_with("#") => acc,
+                _ => acc + x,
+            }
+        })
 }
+// }
 
 //The following code is from latipun7/charasay (MIT Licensed Code)
 //Source Link: https://github.com/latipun7/charasay/blob/main/src/bubbles.rs
@@ -170,4 +206,8 @@ impl SpeechBubble {
 
         Ok(write_buffer.join(""))
     }
+}
+
+pub fn print_cowsay(cowsay: &str, bubble: SpeechBubble, msg: &str) {
+    todo!()
 }
