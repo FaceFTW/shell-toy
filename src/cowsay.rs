@@ -3,21 +3,6 @@ use std::{error::Error, str::from_utf8};
 use strip_ansi_escapes::strip;
 use textwrap::fill;
 use unicode_width::UnicodeWidthStr;
-
-// ///Holds the representation of the "cows" in a format that we can parse/use
-// enum Cowsay {
-//     ///From OG perl cowsay
-//     Cow {
-//         repr: Vec<(char, Option<owo_colors::Style>)>,
-//     },
-//     ///From charasay
-//     Chara { repr: Vec<String> },
-//     ///Defines a Cow that is to be interpreted almost "raw"
-//     /// except for removing the Perl code/substitutions
-//     RawCowsay { repr: String },
-// }
-
-// impl Cowsay{
 pub fn parse_raw_cow(cow_str: &str, is_think: bool) -> String {
     //This is a really cut and dry method for parsing out the Perl bits
     //that originally existed in cow files
@@ -25,14 +10,14 @@ pub fn parse_raw_cow(cow_str: &str, is_think: bool) -> String {
     //LIKE THE ONES HERE: https://charc0al.github.io/cowsay-files/converter/
 
     let thought_char = match is_think {
-        true => 'o',
-        false => '\\',
+        true => "o",
+        false => "\\",
     };
 
     cow_str
         .replace("$thoughts", thought_char)
         .replace("$eyes", "o o")
-        .replace("$toungue", "")
+        .replace("$tongue", "  ")
         .split("\n")
         .fold(String::new(), |acc, x| {
             //this might be a "preemptive check"
@@ -46,17 +31,17 @@ pub fn parse_raw_cow(cow_str: &str, is_think: bool) -> String {
                 "EOC" => acc,
                 "$the_cow = @\"" => acc,
                 "\"@" => acc,
-                _ if &cleaned_str.starts_with("#") => acc,
-                _ => acc + x,
+                _ if cleaned_str.starts_with("#") => acc,
+                _ => acc + x + "\n",
             }
         })
 }
-// }
 
-//The following code is from latipun7/charasay (MIT Licensed Code)
-//Source Link: https://github.com/latipun7/charasay/blob/main/src/bubbles.rs
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord, ValueEnum)]
+/***************************/
+//The following code is derived and modified from latipun7/charasay (MIT Licensed Code)
+//Original Source Link: https://github.com/latipun7/charasay/blob/main/src/bubbles.rs
+/***************************/
+#[derive(Debug, Clone, PartialEq, ValueEnum)]
 pub enum BubbleType {
     Think,
     Round,
@@ -114,7 +99,7 @@ const COWSAY_BUBBLE: SpeechBubble = SpeechBubble {
     short_right: "  >\n",
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SpeechBubble {
     corner_top_left: &'static str,
     top: &'static str,
@@ -156,9 +141,9 @@ impl SpeechBubble {
         Ok(line_lengths.into_iter().max().unwrap_or(0))
     }
 
-    pub fn create(self, messages: &str, max_width: &usize) -> Result<String, Box<dyn Error>> {
+    pub fn create(self, messages: &str, max_width: usize) -> Result<String, Box<dyn Error>> {
         const SPACE: &str = " ";
-        let wrapped = fill(messages, *max_width).replace('\t', "    ");
+        let wrapped = fill(messages, max_width).replace('\t', "    ");
         let lines: Vec<&str> = wrapped.lines().collect();
         let line_count = lines.len();
         let actual_width = Self::longest_line(&lines)?;
@@ -207,7 +192,16 @@ impl SpeechBubble {
         Ok(write_buffer.join(""))
     }
 }
+/***************************/
+//End Derived Code
+/***************************/
 
+//Effectively a main function in the sense it does all the heavy lifting.
 pub fn print_cowsay(cowsay: &str, bubble: SpeechBubble, msg: &str) {
-    todo!()
+    let cow_str = parse_raw_cow(cowsay, false);
+    let msg_str = bubble
+        .create(msg, 64 as usize)
+        .expect("Could not create message bubble");
+
+    println!("{msg_str}{cow_str}")
 }
