@@ -131,7 +131,7 @@ fn comments<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, Terminal
     })(i)
 }
 
-///This parser is for random perl junk we see in files that we want to ignore since we aren't doing perl parsing
+///This parser is for random perl junk we see in files that we want to ignore since we aren't really a perl interpreter
 fn perl_junk<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, TerminalCharacter, E> {
     alt((map(
         alt((
@@ -145,6 +145,8 @@ fn perl_junk<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, Termina
             tag("$the_cow =<<EOC;\r\n"),
             tag("$the_cow = <<\"EOC\";\n"),
             tag("$the_cow = <<\"EOC\";\r\n"),
+            tag("$the_cow = <<EOC;\n"),
+            tag("$the_cow = <<EOC;\r\n"),
             tag("binmode STDOUT, \":utf8\";\n"),
             tag("binmode STDOUT, \":utf8\";\r\n"),
         )),
