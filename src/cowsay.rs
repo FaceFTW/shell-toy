@@ -1,5 +1,4 @@
 use crate::parser::{cow_parser, TerminalCharacter};
-use clap::ValueEnum;
 use owo_colors::{OwoColorize, XtermColors};
 use std::{error::Error, str::from_utf8};
 use strip_ansi_escapes::strip;
@@ -9,7 +8,7 @@ use unicode_width::UnicodeWidthStr;
 //The following code is derived and modified from latipun7/charasay (MIT Licensed Code)
 //Original Source Link: https://github.com/latipun7/charasay/blob/main/src/bubbles.rs
 /***************************/
-#[derive(Debug, Clone, PartialEq, ValueEnum)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum BubbleType {
     Think,
     Round,
