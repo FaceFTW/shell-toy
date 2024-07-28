@@ -1,11 +1,10 @@
 ///Functions for processing files and related things. Also checks environment variables for certain things
+use rand::{seq::SliceRandom, thread_rng};
 use std::{
     fs,
     io::{self, Read},
     path::PathBuf,
 };
-
-use rand::{seq::SliceRandom, thread_rng};
 
 fn get_list_of_cows(path: &PathBuf) -> Result<Vec<String>, io::Error> {
     let mut total_list = vec![];
@@ -59,4 +58,8 @@ pub fn identify_cow_path() -> PathBuf {
 			_ => panic!("I don't know what the default path for cowfiles is for this OS!.\nPlease provide a COWPATH or COW_PATH environment variable")
 		}
     }
+}
+
+pub fn choose_fortune_file() -> PathBuf {
+    todo!()
 }
