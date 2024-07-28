@@ -28,7 +28,7 @@ pub enum TerminalCharacter {
 
 fn spaces_and_lines(input: &str) -> IResult<&str, TerminalCharacter> {
     alt((
-		map(tag("\r\n"), |_| TerminalCharacter::Newline),
+        map(tag("\r\n"), |_| TerminalCharacter::Newline),
         map(tag("\n"), |_| TerminalCharacter::Newline),
         map(tag(" "), |_| TerminalCharacter::Space),
     ))(input)
@@ -173,14 +173,4 @@ pub fn cow_parser(input: &str) -> IResult<&str, TerminalCharacter> {
             TerminalCharacter::UnicodeCharacter(c.chars().into_iter().next().unwrap())
         }),
     ))(input)
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn parser_test_comment_parsing() {
-        let string = "
-			# test1,
-			# test2";
-    }
 }

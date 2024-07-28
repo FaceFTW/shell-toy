@@ -1,8 +1,11 @@
 use clap::ValueEnum;
+use owo_colors::{OwoColorize, XtermColors};
 use std::{error::Error, str::from_utf8};
 use strip_ansi_escapes::strip;
 use textwrap::fill;
 use unicode_width::UnicodeWidthStr;
+
+use crate::parser::TerminalCharacter;
 pub fn parse_raw_cow(cow_str: &str, is_think: bool) -> String {
     //This is a really cut and dry method for parsing out the Perl bits
     //that originally existed in cow files
@@ -204,4 +207,47 @@ pub fn print_cowsay(cowsay: &str, bubble: SpeechBubble, msg: &str) {
         .expect("Could not create message bubble");
 
     println!("{msg_str}{cow_str}")
+}
+
+pub fn derive_cow_str(parsed_chars: &[TerminalCharacter]) -> String {
+    //Because colors will change before characters are created, we take an owo_colors style
+    // and use it as the "current style under tracking". As we created the string, we apply the style necessary to each character
+    let mut current_style = owo_colors::Style::new().default_color();
+    //TODO Determine if we should pre-allocate the memory with an "estimate" for performance
+    let mut cow_string = String::new();
+    for term_char in parsed_chars {
+        match term_char {
+            TerminalCharacter::Space => {
+                cow_string = cow_string + format!("{}", " ".style(current_style)).as_str()
+            }
+            TerminalCharacter::DefaultForegroundColor => {
+                current_style = current_style.default_color()
+            }
+            TerminalCharacter::DefaultBackgroundColor => {
+                current_style = current_style.on_default_color()
+            } //TODO how to set owo_colors background default
+            TerminalCharacter::TerminalForegroundColor256(color) => {
+                current_style = current_style.color(XtermColors::from(*color))
+            }
+            TerminalCharacter::TerminalForegroundColorTruecolor(red, green, blue) => {
+                current_style = current_style.truecolor(*red, *green, *blue)
+            }
+            TerminalCharacter::TerminalBackgroundColor256(color) => {
+                current_style = current_style.on_color(XtermColors::from(*color))
+            }
+            TerminalCharacter::TerminalBackgroundColorTruecolor(red, green, blue) => {
+                current_style = current_style.on_truecolor(*red, *green, *blue);
+            }
+            TerminalCharacter::UnicodeCharacter(uchar) => {
+                cow_string = cow_string + format!("{}", uchar.style(current_style)).as_str()
+            }
+            TerminalCharacter::ThoughtPlaceholder => cow_string = cow_string + "\\",
+            TerminalCharacter::EyePlaceholder => cow_string = cow_string + "o o",
+            TerminalCharacter::TonguePlaceholder => cow_string = cow_string + "  ",
+            TerminalCharacter::Newline => cow_string = cow_string + "\n",
+            TerminalCharacter::Comment => (),
+        }
+    }
+
+    cow_string
 }
