@@ -1,3 +1,5 @@
+///Imaging writing an entire parser for a Perl-like language just for a tiny little tool
+/// couldn't be me hahahahahahaha
 use nom::{
     branch::alt,
     bytes::complete::{tag, take, take_until},
@@ -131,24 +133,23 @@ fn comments<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, Terminal
 
 ///This parser is for random perl junk we see in files that we want to ignore since we aren't doing perl parsing
 fn perl_junk<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, TerminalCharacter, E> {
-    alt((
-        map(tag("EOC"), |_| TerminalCharacter::Comment),
-        map(tag("EOC\n"), |_| TerminalCharacter::Comment),
-        map(tag("$the_cow =<<EOC;\n"), |_| TerminalCharacter::Comment),
-        map(tag("$the_cow =<<EOC;\r\n"), |_| TerminalCharacter::Comment),
-        map(tag("$the_cow = <<\"EOC\";\n"), |_| {
-            TerminalCharacter::Comment
-        }),
-        map(tag("$the_cow = <<\"EOC\";\r\n"), |_| {
-            TerminalCharacter::Comment
-        }),
-        map(tag("binmode STDOUT, \":utf8\";\n"), |_| {
-            TerminalCharacter::Comment
-        }),
-        map(tag("binmode STDOUT, \":utf8\";\r\n"), |_| {
-            TerminalCharacter::Comment
-        }),
-    ))(i)
+    alt((map(
+        alt((
+            tag("EOC\n"),
+            tag("EOC\r\n"),
+            tag("\"@\n"),
+            tag("\"@\r\n"),
+            tag("$the_cow = @\"\n"),
+            tag("$the_cow = @\"\r\n"),
+            tag("$the_cow =<<EOC;\n"),
+            tag("$the_cow =<<EOC;\r\n"),
+            tag("$the_cow = <<\"EOC\";\n"),
+            tag("$the_cow = <<\"EOC\";\r\n"),
+            tag("binmode STDOUT, \":utf8\";\n"),
+            tag("binmode STDOUT, \":utf8\";\r\n"),
+        )),
+        |_| TerminalCharacter::Comment,
+    ),))(i)
 }
 fn placeholders<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, TerminalCharacter, E> {
     alt((

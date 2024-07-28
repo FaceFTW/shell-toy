@@ -1,45 +1,10 @@
+use crate::parser::{cow_parser, TerminalCharacter};
 use clap::ValueEnum;
 use owo_colors::{OwoColorize, XtermColors};
 use std::{error::Error, str::from_utf8};
 use strip_ansi_escapes::strip;
 use textwrap::fill;
 use unicode_width::UnicodeWidthStr;
-
-use crate::parser::TerminalCharacter;
-pub fn parse_raw_cow(cow_str: &str, is_think: bool) -> String {
-    //This is a really cut and dry method for parsing out the Perl bits
-    //that originally existed in cow files
-    //THIS WILL BREAK IF WE HAVE COWS USING SPECIAL VAR SUBSTITUTION
-    //LIKE THE ONES HERE: https://charc0al.github.io/cowsay-files/converter/
-
-    let thought_char = match is_think {
-        true => "o",
-        false => "\\",
-    };
-
-    cow_str
-        .replace("$thoughts", thought_char)
-        .replace("$eyes", "o o")
-        .replace("$tongue", "  ")
-        .split("\n")
-        .fold(String::new(), |acc, x| {
-            //this might be a "preemptive check"
-            let cleaned_str = x.replace("\r", "");
-            match cleaned_str.as_str() {
-                //TODO this is incredibly brute-force
-                "$the_cow = <<\"EOC\";" => acc,
-                "$the_cow= <<\"EOC\";" => acc,
-                "$the_cow=<<\"EOC\";" => acc,
-                "$the_cow =<<\"EOC\";" => acc,
-                "EOC" => acc,
-                "$the_cow = @\"" => acc,
-                "\"@" => acc,
-                _ if cleaned_str.starts_with("#") => acc,
-                _ => acc + x + "\n",
-            }
-        })
-}
-
 /***************************/
 //The following code is derived and modified from latipun7/charasay (MIT Licensed Code)
 //Original Source Link: https://github.com/latipun7/charasay/blob/main/src/bubbles.rs
@@ -198,17 +163,6 @@ impl SpeechBubble {
 /***************************/
 //End Derived Code
 /***************************/
-
-//Effectively a main function in the sense it does all the heavy lifting.
-pub fn print_cowsay(cowsay: &str, bubble: SpeechBubble, msg: &str) {
-    let cow_str = parse_raw_cow(cowsay, false);
-    let msg_str = bubble
-        .create(msg, 64 as usize)
-        .expect("Could not create message bubble");
-
-    println!("{msg_str}{cow_str}")
-}
-
 pub fn derive_cow_str(parsed_chars: &[TerminalCharacter]) -> String {
     //Because colors will change before characters are created, we take an owo_colors style
     // and use it as the "current style under tracking". As we created the string, we apply the style necessary to each character
@@ -225,7 +179,7 @@ pub fn derive_cow_str(parsed_chars: &[TerminalCharacter]) -> String {
             }
             TerminalCharacter::DefaultBackgroundColor => {
                 current_style = current_style.on_default_color()
-            } //TODO how to set owo_colors background default
+            }
             TerminalCharacter::TerminalForegroundColor256(color) => {
                 current_style = current_style.color(XtermColors::from(*color))
             }
@@ -250,4 +204,16 @@ pub fn derive_cow_str(parsed_chars: &[TerminalCharacter]) -> String {
     }
 
     cow_string
+}
+
+//Effectively a main function in the sense it does all the heavy lifting.
+pub fn print_cowsay(cowsay: &str, bubble: SpeechBubble, msg: &str) {
+    let mut nom_it = nom::combinator::iterator(cowsay, cow_parser);
+    let cow_str = derive_cow_str(nom_it.collect::<Vec<TerminalCharacter>>().as_slice());
+    // parse_raw_cow(cowsay, false);
+    let msg_str = bubble
+        .create(msg, 64 as usize)
+        .expect("Could not create message bubble");
+
+    println!("{msg_str}{cow_str}")
 }
