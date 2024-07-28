@@ -1,10 +1,10 @@
 use nom::{
     branch::alt,
-    bytes::complete::{tag, take},
-    character::complete::{digit1, newline},
+    bytes::complete::{tag, take, take_until},
+    character::complete::digit1,
     combinator::map,
-    number::complete::u8,
-    sequence::{delimited, preceded, terminated, tuple},
+    error::ParseError,
+    sequence::{delimited, preceded, tuple},
     IResult,
 };
 
@@ -14,49 +14,173 @@ pub enum TerminalCharacter {
     Space,
     DefaultForegroundColor,
     DefaultBackgroundColor,
-    TerminalForegroundColor8(u8),
-    TerminalForegroundColor24(u32),
-    TerminalBackgroundColor8(u8),
-    TerminalBackgroundColor24(u32),
+    TerminalForegroundColor256(u8),
+    TerminalForegroundColorTruecolor(u8, u8, u8),
+    TerminalBackgroundColor256(u8),
+    TerminalBackgroundColorTruecolor(u8, u8, u8),
     UnicodeCharacter(char),
     ThoughtPlaceholder,
+    EyePlaceholder,
+    TonguePlaceholder,
     Newline,
     Comment,
 }
 
-fn terminal_chars(input: &str) -> IResult<&str, TerminalCharacter> {
-    alt((
-        map(
-            delimited(tag("\\e["), digit1, tag("m")),
-            |esc: &str| match esc {
-                "39" => Ok(TerminalCharacter::DefaultForegroundColor),
-                "49" => Ok(TerminalCharacter::DefaultBackgroundColor),
-                _ => Err("Unknown Escape!"),
-            },
-        ),
-        // map(
-        //     delimited(
-        //         tag("\\e["),
-        //         tuple(digit1, tag(";"), digit1, tag(";"), digit1),
-        //         tag("m"),
-        //     ),
-        //     |esc: &str| todo!(),
-        // ),
-    ))(input);
-    todo!()
-}
-
-fn unicode_char(input: &str) -> IResult<&str, TerminalCharacter> {
-    todo!()
-}
-
 fn spaces_and_lines(input: &str) -> IResult<&str, TerminalCharacter> {
     alt((
+		map(tag("\r\n"), |_| TerminalCharacter::Newline),
         map(tag("\n"), |_| TerminalCharacter::Newline),
         map(tag(" "), |_| TerminalCharacter::Space),
     ))(input)
 }
 
-fn terminal_foreground_8(input: &str) -> IResult<&str, TerminalCharacter> {
-    todo!()
+fn misc_escapes<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, TerminalCharacter, E> {
+    map(
+        delimited(tag("\\e["), alt((tag("39"), tag("49"))), tag("m")),
+        |esc: &str| match esc {
+            "39" => TerminalCharacter::DefaultForegroundColor,
+            "49" => TerminalCharacter::DefaultBackgroundColor,
+            _ => panic!(), //TODO Change this to some error handling
+        },
+    )(i)
+}
+
+fn colors_256<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, TerminalCharacter, E> {
+    map(
+        delimited(
+            tag("\\e["),
+            tuple((
+                alt((tag("38"), tag("48"))),
+                tag(";"),
+                tag("5"),
+                tag(";"),
+                digit1,
+            )),
+            tag("m"),
+        ),
+        |(color_type, _, _, _, color)| match color_type {
+            "38" => TerminalCharacter::TerminalForegroundColor256(str::parse(color).unwrap()),
+            "48" => TerminalCharacter::TerminalBackgroundColor256(str::parse(color).unwrap()),
+            _ => panic!(), //TODO change this to some kind of error handling
+        },
+    )(i)
+}
+
+fn truecolor<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, TerminalCharacter, E> {
+    map(
+        delimited(
+            tag("\\e["),
+            tuple((
+                alt((tag("38"), tag("48"))),
+                tag(";"),
+                tag("2"),
+                tag(";"),
+                digit1,
+                tag(";"),
+                digit1,
+                tag(";"),
+                digit1,
+            )),
+            tag("m"),
+        ),
+        |(color_type, _, _, _, red, _, green, _, blue)| {
+            match color_type {
+                "38" => TerminalCharacter::TerminalForegroundColorTruecolor(
+                    str::parse(red).unwrap(),
+                    str::parse(green).unwrap(),
+                    str::parse(blue).unwrap(),
+                ),
+                "48" => TerminalCharacter::TerminalBackgroundColorTruecolor(
+                    str::parse(red).unwrap(),
+                    str::parse(green).unwrap(),
+                    str::parse(blue).unwrap(),
+                ),
+                _ => panic!(), //TODO change this to some kind of error handling
+            }
+        },
+    )(i)
+}
+
+fn unicode_char<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, TerminalCharacter, E> {
+    //Turns out, there are different ways to parse unicode escapes.
+    //This is my best attempt at covering them
+    alt((
+        //Xterm -\\N{U+xxxx}
+        map(
+            delimited(tag("\\N{U+"), take(4 as usize), tag("}")),
+            |code: &str| {
+                TerminalCharacter::UnicodeCharacter(
+                    char::from_u32(u32::from_str_radix(code, 16).unwrap()).unwrap(),
+                )
+            },
+        ),
+        //ANSI - \\uxxxx
+        map(preceded(tag("\\u"), take(4 as usize)), |code: &str| {
+            TerminalCharacter::UnicodeCharacter(
+                char::from_u32(u32::from_str_radix(code, 16).unwrap()).unwrap(),
+            )
+        }),
+    ))(i)
+}
+
+fn comments<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, TerminalCharacter, E> {
+    map(preceded(tag("#"), take_until("\n")), |_| {
+        TerminalCharacter::Comment
+    })(i)
+}
+
+///This parser is for random perl junk we see in files that we want to ignore since we aren't doing perl parsing
+fn perl_junk<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, TerminalCharacter, E> {
+    alt((
+        map(tag("EOC"), |_| TerminalCharacter::Comment),
+        map(tag("EOC\n"), |_| TerminalCharacter::Comment),
+        map(tag("$the_cow =<<EOC;\n"), |_| TerminalCharacter::Comment),
+        map(tag("$the_cow =<<EOC;\r\n"), |_| TerminalCharacter::Comment),
+        map(tag("$the_cow = <<\"EOC\";\n"), |_| {
+            TerminalCharacter::Comment
+        }),
+        map(tag("$the_cow = <<\"EOC\";\r\n"), |_| {
+            TerminalCharacter::Comment
+        }),
+        map(tag("binmode STDOUT, \":utf8\";\n"), |_| {
+            TerminalCharacter::Comment
+        }),
+        map(tag("binmode STDOUT, \":utf8\";\r\n"), |_| {
+            TerminalCharacter::Comment
+        }),
+    ))(i)
+}
+fn placeholders<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, TerminalCharacter, E> {
+    alt((
+        map(tag("$thoughts"), |_| TerminalCharacter::ThoughtPlaceholder),
+        map(tag("$eyes"), |_| TerminalCharacter::EyePlaceholder),
+        map(tag("$tongue"), |_| TerminalCharacter::TonguePlaceholder),
+    ))(i)
+}
+
+pub fn cow_parser(input: &str) -> IResult<&str, TerminalCharacter> {
+    alt((
+        comments,
+        perl_junk,
+        placeholders,
+        spaces_and_lines,
+        misc_escapes,
+        colors_256,
+        truecolor,
+        unicode_char,
+        map(take(1 as usize), |c: &str| {
+            //TODO I don't like this
+            TerminalCharacter::UnicodeCharacter(c.chars().into_iter().next().unwrap())
+        }),
+    ))(input)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn parser_test_comment_parsing() {
+        let string = "
+			# test1,
+			# test2";
+    }
 }
