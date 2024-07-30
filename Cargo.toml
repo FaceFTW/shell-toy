@@ -1,23 +1,23 @@
 [package]
-name = "shell-intro"
+name = "shell-toy"
 version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "sh-intro"
+name = "sh-toy"
 path = "src/main.rs"
 
 [dependencies]
-anstyle = "1"
 owo-colors = "3"
-anstyle-owo-colors = "2"
 nom = "7"
 rand = "0.8.5"
-byteorder = "1"
 argh = "0.1"
-# clap = { version = "4.5.4", features = ["derive"] }
-textwrap = "*"
-strip-ansi-escapes = "*"
-unicode-width = "*"
+textwrap = "0.16"
+strip-ansi-escapes = "0.2"
+unicode-width = "0.1"
 
 [features]
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
