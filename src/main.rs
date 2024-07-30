@@ -8,7 +8,8 @@ use std::{fs::File, io::Read, path::PathBuf};
 
 use cli::Options;
 use cowsay::{print_cowsay, SpeechBubble};
-use file::{choose_random_cow, identify_cow_path};
+use file::{choose_fortune_file, choose_random_cow, identify_cow_path};
+use fortune::get_fortune;
 
 fn main() {
     let options: Options = argh::from_env();
@@ -34,18 +35,19 @@ fn main() {
         }
     };
 
-
-
-
-
-
-
-
+    let cow_msg = match options.message {
+        Some(msg) => msg,
+        None => {
+            let fortune_file = choose_fortune_file(options.include_offensive);
+            get_fortune(&fortune_file)
+                .expect("Could not get a fortune, your future is shrouded in mystery...")
+        }
+    };
 
     print_cowsay(
         &cow_str,
         SpeechBubble::new(cowsay::BubbleType::Cowsay),
-        &options.message,
+        &cow_msg,
     );
 
     // let test_cow = include_str!("../cows/default.cow");

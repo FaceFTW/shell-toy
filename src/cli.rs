@@ -11,6 +11,10 @@ pub(crate) struct Options {
     ///path to a folder containing multiple cows we should search.
     pub cow_path: Option<String>,
 
+    #[argh(option, default = "false")]
+    /// whether to include offensive fortunes
+    pub include_offensive: bool,
+
     #[argh(positional)]
-    pub message: String,
+    pub message: Option<String>,
 }
