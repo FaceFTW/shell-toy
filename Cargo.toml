@@ -10,7 +10,9 @@ path = "src/main.rs"
 [dependencies]
 owo-colors = "3"
 nom = "7"
-rand = "0.8.5"
+# rand = "0.8.5"
+tinyrand = "0.5"
+getrandom = "0.2"
 argh = "0.1"
 textwrap = "0.16"
 strip-ansi-escapes = "0.2"
@@ -21,3 +23,6 @@ unicode-width = "0.1"
 [profile.release]
 codegen-units = 1
 lto = "thin"
+opt-level = 'z'
+strip = true
+panic = "abort"

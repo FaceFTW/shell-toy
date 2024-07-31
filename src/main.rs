@@ -10,8 +10,14 @@ use cli::Options;
 use cowsay::{print_cowsay, SpeechBubble};
 use file::{choose_fortune_file, choose_random_cow, identify_cow_path};
 use fortune::get_fortune;
+use tinyrand::{Seeded, StdRand};
 
 fn main() {
+    //Init RNG
+    let mut buf = [0u8; 8];
+    getrandom::getrandom(&mut buf).expect("Could not open entropy source!");
+    let mut rng = StdRand::seed(u64::from_le_bytes(buf));
+
     let options: Options = argh::from_env();
 
     let cow_str = match &options {
@@ -26,20 +32,21 @@ fn main() {
                 Err(e) => panic!("{e}"),
             }
         }
-        options if options.cow_path.is_some() => {
-            choose_random_cow(&PathBuf::from(options.cow_path.as_deref().unwrap()))
-        }
+        options if options.cow_path.is_some() => choose_random_cow(
+            &PathBuf::from(options.cow_path.as_deref().unwrap()),
+            &mut rng,
+        ),
         _ => {
             let cow_path = identify_cow_path();
-            choose_random_cow(&cow_path)
+            choose_random_cow(&cow_path, &mut rng)
         }
     };
 
     let cow_msg = match options.message {
         Some(msg) => msg,
         None => {
-            let fortune_file = choose_fortune_file(options.include_offensive);
-            get_fortune(&fortune_file)
+            let fortune_file = choose_fortune_file(options.include_offensive, &mut rng);
+            get_fortune(&fortune_file, &mut rng)
                 .expect("Could not get a fortune, your future is shrouded in mystery...")
         }
     };

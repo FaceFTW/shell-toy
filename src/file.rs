@@ -1,5 +1,3 @@
-///Functions for processing files and related things. Also checks environment variables for certain things
-use rand::{seq::SliceRandom, thread_rng};
 use std::{
     cell::LazyCell,
     ffi::OsStr,
@@ -7,6 +5,9 @@ use std::{
     io::{self, Read},
     path::PathBuf,
 };
+///Functions for processing files and related things. Also checks environment variables for certain things
+// use rand::{seq::SliceRandom, thread_rng};
+use tinyrand::Rand;
 
 fn get_list_of_cows(path: &PathBuf) -> Result<Vec<String>, io::Error> {
     let mut total_list = vec![];
@@ -28,14 +29,12 @@ fn get_list_of_cows(path: &PathBuf) -> Result<Vec<String>, io::Error> {
     Ok(total_list)
 }
 
-pub fn choose_random_cow(cow_path: &PathBuf) -> String {
-    let mut rng = thread_rng();
+pub fn choose_random_cow(cow_path: &PathBuf, rng: &mut impl Rand) -> String {
+    // let mut rng = thread_rng();
     let cow_list = get_list_of_cows(cow_path).expect("Could not open the cow path");
+    let chosen_idx = rng.next_lim_usize(cow_list.len());
 
-    let chosen_path = cow_list
-        .as_slice()
-        .choose(&mut rng)
-        .expect("List had no elements to choose from!");
+    let chosen_path = &cow_list[chosen_idx];
     match fs::File::open(chosen_path) {
         Ok(mut file) => {
             let mut cow_str = String::new();
@@ -62,15 +61,15 @@ pub fn identify_cow_path() -> PathBuf {
     }
 }
 
-pub fn choose_fortune_file(include_offensive: bool) -> PathBuf {
+pub fn choose_fortune_file(include_offensive: bool, rng: &mut impl Rand) -> PathBuf {
     let os = std::env::consts::OS;
     if let Ok(val) = std::env::var("FORTUNE_FILE") {
         PathBuf::from(val.as_str())
     } else if let Ok(val) = std::env::var("FORTUNE_PATH") {
-        choose_random_fortune_file(&PathBuf::from(val.as_str()), include_offensive)
+        choose_random_fortune_file(&PathBuf::from(val.as_str()), include_offensive, rng)
             .expect("Could not choose a random fortune file from the specified Fortune Path")
     } else if let Ok(val) = std::env::var("FORTUNEPATH") {
-        choose_random_fortune_file(&PathBuf::from(val.as_str()), include_offensive)
+        choose_random_fortune_file(&PathBuf::from(val.as_str()), include_offensive, rng)
             .expect("Could not choose a random fortune file from the specified Fortune Path")
     } else {
         match os{
@@ -103,6 +102,7 @@ pub const ILLEGAL_FILE_SUFFIXES: LazyCell<[&OsStr; 13]> = LazyCell::new(|| {
 pub fn choose_random_fortune_file(
     path: &PathBuf,
     include_offensive: bool,
+    rng: &mut impl Rand,
 ) -> Result<PathBuf, io::Error> {
     //Couple of rules when it comes to fortune files (defaults)
     //1. Default fortunes are in /usr/share/games/fortunes
@@ -140,11 +140,9 @@ pub fn choose_random_fortune_file(
         total_list
     }
 
-    let mut rng = thread_rng();
+    // let mut rng = thread_rng();
     let list = iterate(path, include_offensive);
+    let chosen_idx = rng.next_lim_usize(list.len());
 
-    match list.choose(&mut rng) {
-        Some(val) => Ok(val.clone()),
-        None => panic!("Could not choose a random fortune file!"),
-    }
+    Ok(list[chosen_idx].clone())
 }
