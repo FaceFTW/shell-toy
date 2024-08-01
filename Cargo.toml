@@ -10,7 +10,6 @@ path = "src/main.rs"
 [dependencies]
 owo-colors = "3"
 nom = "7"
-# rand = "0.8.5"
 tinyrand = "0.5"
 getrandom = "0.2"
 argh = "0.1"

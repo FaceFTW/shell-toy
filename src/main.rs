@@ -1,15 +1,13 @@
 mod cli;
 mod cowsay;
-mod file;
 mod fortune;
 mod parser;
 
 use std::{fs::File, io::Read, path::PathBuf};
 
 use cli::Options;
-use cowsay::{print_cowsay, SpeechBubble};
-use file::{choose_fortune_file, choose_random_cow, identify_cow_path};
-use fortune::get_fortune;
+use cowsay::{choose_random_cow, identify_cow_path, print_cowsay, SpeechBubble};
+use fortune::{choose_fortune_file, get_fortune};
 use tinyrand::{Seeded, StdRand};
 
 fn main() {
@@ -56,31 +54,4 @@ fn main() {
         SpeechBubble::new(cowsay::BubbleType::Cowsay),
         &cow_msg,
     );
-
-    // let test_cow = include_str!("../cows/default.cow");
-    // let test_new_cow = include_str!("../cows/025_pikachu-alola-cap.cow");
-    // let test_dragon_cow = include_str!("../cows/dragon.cow");
-
-    // let mut it = nom::combinator::iterator(test_new_cow, cow_parser);
-    // let parsed = it.collect::<Vec<TerminalCharacter>>();
-    // println!("{:#?}\n", parsed);
-    // print!("{:#}\n", derive_cow_str(parsed.as_slice()));
-
-    // let mut it = nom::combinator::iterator(test_cow, cow_parser);
-    // let parsed2 = it.collect::<Vec<TerminalCharacter>>();
-    // println!("{:#?}\n", parsed2);
-    // print!("{:#}\n", derive_cow_str(parsed2.as_slice()));
-
-    // println!("{:#?}\n", parser::cow_parser(test_new_cow));
-
-    // let test_msg = "Test\ntesting\ntesting.......";
-    // let test_short_msg = "deez nuts";
-    // let test_long_msg ="lmaooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo";
-    // let bubble = SpeechBubble::new(cowsay::BubbleType::Cowsay);
-
-    // print_cowsay(&test_cow, bubble.clone(), &test_msg);
-    // print_cowsay(&test_cow, bubble.clone(), &test_short_msg);
-    // print_cowsay(&test_cow, bubble.clone(), &test_long_msg);
-    // print_cowsay(&test_new_cow, bubble.clone(), &test_long_msg);
-    // print_cowsay(&test_dragon_cow, bubble.clone(), &test_long_msg);
 }

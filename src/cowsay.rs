@@ -1,8 +1,15 @@
 use crate::parser::{cow_parser, TerminalCharacter};
 use owo_colors::{OwoColorize, XtermColors};
-use std::{error::Error, str::from_utf8};
+use std::{
+    error::Error,
+    fs::{self},
+    io::{self, Read},
+    path::PathBuf,
+    str::from_utf8,
+};
 use strip_ansi_escapes::strip;
 use textwrap::fill;
+use tinyrand::Rand;
 use unicode_width::UnicodeWidthStr;
 /***************************/
 //The following code is derived and modified from latipun7/charasay (MIT Licensed Code)
@@ -215,4 +222,56 @@ pub fn print_cowsay(cowsay: &str, bubble: SpeechBubble, msg: &str) {
         .expect("Could not create message bubble");
 
     println!("{msg_str}{cow_str}")
+}
+
+fn get_list_of_cows(path: &PathBuf) -> Result<Vec<String>, io::Error> {
+    let mut total_list = vec![];
+    let dir_list = fs::read_dir(path)?;
+    for entry in dir_list {
+        match entry {
+            Ok(item) => match item.metadata()?.is_dir() {
+                true => total_list.append(get_list_of_cows(&item.path()).unwrap().as_mut()),
+                false => {
+                    if item.path().extension().unwrap() == "cow" {
+                        total_list.push(item.path().to_str().unwrap().to_string());
+                    }
+                }
+            },
+            Err(e) => return Err(e),
+        }
+    }
+
+    Ok(total_list)
+}
+
+pub fn choose_random_cow(cow_path: &PathBuf, rng: &mut impl Rand) -> String {
+    // let mut rng = thread_rng();
+    let cow_list = get_list_of_cows(cow_path).expect("Could not open the cow path");
+    let chosen_idx = rng.next_lim_usize(cow_list.len());
+
+    let chosen_path = &cow_list[chosen_idx];
+    match fs::File::open(chosen_path) {
+        Ok(mut file) => {
+            let mut cow_str = String::new();
+            file.read_to_string(&mut cow_str)
+                .expect("Error reading cow string");
+            cow_str
+        }
+        Err(e) => panic!("{e}"),
+    }
+}
+
+pub fn identify_cow_path() -> PathBuf {
+    //Check if we have an environment variable defined:
+    let os = std::env::consts::OS;
+    if let Ok(val) = std::env::var("COWPATH") {
+        PathBuf::from(val.as_str())
+    } else if let Ok(val) = std::env::var("COW_PATH") {
+        PathBuf::from(val.as_str())
+    } else {
+        match os{
+            "linux" => PathBuf::from("/usr/share/cowsay/cows"),
+            _ => panic!("I don't know what the default path for cowfiles is for this OS!.\nPlease provide a COWPATH or COW_PATH environment variable")
+        }
+    }
 }
