@@ -51,7 +51,7 @@ fn main() {
 
     print_cowsay(
         &cow_str,
-        SpeechBubble::new(cowsay::BubbleType::Cowsay),
+        SpeechBubble::new(options.bubble_type),
         &cow_msg,
     );
 }
