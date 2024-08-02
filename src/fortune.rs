@@ -24,7 +24,7 @@ pub fn get_fortune(file_path: &PathBuf, rng: &mut impl Rand) -> Result<String, B
         Ok(mut file) => {
             let mut string_buf = String::new();
             let _result = file.read_to_string(&mut string_buf)?;
-            let split: Vec<&str> = string_buf.split("%").collect();
+            let split: Vec<&str> = string_buf.split("\n%\n").collect();
             let chosen_idx = rng.next_lim_usize(split.len());
             Ok(split[chosen_idx].to_string())
         }
