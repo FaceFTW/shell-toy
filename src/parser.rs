@@ -28,6 +28,7 @@ pub enum TerminalCharacter {
     Comment,
     VarBinding(String, Vec<TerminalCharacter>), //Think in terms of s-expr-like interpretation then this makes sense
     BoundVarCall(String),
+    CowStart,
 }
 
 fn spaces_and_lines(input: &str) -> IResult<&str, TerminalCharacter> {
@@ -178,32 +179,40 @@ fn comments<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, Terminal
 }
 
 ///This parser is for random perl junk we see in files that we want to ignore since we aren't really a perl interpreter
+/// Some of it *is* useful when it comes to acting as a "barrier" between actual text we want to parse
 fn perl_junk<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, TerminalCharacter, E> {
-    alt((map(
-        alt((
-            tag("EOC\n"),
-            tag("EOC\r\n"),
-            tag("\"@\n"),
-            tag("\"@\r\n"),
-            tag("$the_cow = @\"\n"),
-            tag("$the_cow = @\"\r\n"),
-            tag("$the_cow =<<EOC;\n"),
-            tag("$the_cow =<<EOC;\r\n"),
-            tag("$the_cow = <<\"EOC\";\n"),
-            tag("$the_cow = <<\"EOC\";\r\n"),
-            tag("$the_cow = <<EOC;\n"),
-            tag("$the_cow = <<EOC;\r\n"),
-            tag("$the_cow = << EOC;\n"),
-            tag("$the_cow = << EOC;\r\n"),
-            tag("$the_cow = << EOC\n"),
-            tag("$the_cow = << EOC\r\n"),
-            tag("$the_cow = <<EOC\n"),
-            tag("$the_cow = <<EOC\r\n"),
-            tag("binmode STDOUT, \":utf8\";\n"),
-            tag("binmode STDOUT, \":utf8\";\r\n"),
-        )),
-        |_| TerminalCharacter::Comment,
-    ),))(i)
+    alt((
+        map(
+            alt((
+                tag("EOC\n"),
+                tag("EOC\r\n"),
+                tag("\"@\n"),
+                tag("\"@\r\n"),
+                tag("binmode STDOUT, \":utf8\";\n"),
+                tag("binmode STDOUT, \":utf8\";\r\n"),
+            )),
+            |_| TerminalCharacter::Comment,
+        ),
+        map(
+            alt((
+                tag("$the_cow = @\"\n"),
+                tag("$the_cow = @\"\r\n"),
+                tag("$the_cow =<<EOC;\n"),
+                tag("$the_cow =<<EOC;\r\n"),
+                tag("$the_cow = <<\"EOC\";\n"),
+                tag("$the_cow = <<\"EOC\";\r\n"),
+                tag("$the_cow = <<EOC;\n"),
+                tag("$the_cow = <<EOC;\r\n"),
+                tag("$the_cow = << EOC;\n"),
+                tag("$the_cow = << EOC;\r\n"),
+                tag("$the_cow = << EOC\n"),
+                tag("$the_cow = << EOC\r\n"),
+                tag("$the_cow = <<EOC\n"),
+                tag("$the_cow = <<EOC\r\n"),
+            )),
+            |_| TerminalCharacter::CowStart,
+        ),
+    ))(i)
 }
 fn placeholders<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, TerminalCharacter, E> {
     alt((

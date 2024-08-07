@@ -172,16 +172,20 @@ impl SpeechBubble {
 /***************************/
 pub fn derive_cow_str(parsed_chars: &[TerminalCharacter]) -> String {
     let mut environment: HashMap<String, Vec<TerminalCharacter>> = HashMap::new();
-
     //Because colors will change before characters are created, we take an owo_colors style
     // and use it as the "current style under tracking". As we created the string, we apply the style necessary to each character
     let mut current_style = owo_colors::Style::new().default_color();
+
+    let mut cow_started = false;
     //TODO Determine if we should pre-allocate the memory with an "estimate" for performance
     let mut cow_string = String::new();
     for term_char in parsed_chars {
         match term_char {
             TerminalCharacter::Space => {
-                cow_string = cow_string + format!("{}", " ".style(current_style)).as_str()
+                // if cow_started {
+                    //Assume first whitespace we see is part of the cow to output
+                    cow_string = cow_string + format!("{}", " ".style(current_style)).as_str()
+                // }
             }
             TerminalCharacter::DefaultForegroundColor => {
                 current_style = current_style.default_color()
@@ -207,7 +211,11 @@ pub fn derive_cow_str(parsed_chars: &[TerminalCharacter]) -> String {
             TerminalCharacter::ThoughtPlaceholder => cow_string = cow_string + "\\",
             TerminalCharacter::EyePlaceholder => cow_string = cow_string + "o o",
             TerminalCharacter::TonguePlaceholder => cow_string = cow_string + "  ",
-            TerminalCharacter::Newline => cow_string = cow_string + "\n",
+            TerminalCharacter::Newline => {
+                if cow_started {
+                    cow_string = cow_string + "\n";
+                }
+            }
             TerminalCharacter::Comment => (),
             TerminalCharacter::VarBinding(name, val) => {
                 environment.insert(name.to_string(), val.to_vec());
@@ -218,6 +226,7 @@ pub fn derive_cow_str(parsed_chars: &[TerminalCharacter]) -> String {
                     .expect("Could not find a binding with the specified name");
                 cow_string = cow_string + derive_cow_str(&binding_val).as_str();
             }
+            TerminalCharacter::CowStart => cow_started = true,
         }
     }
 
