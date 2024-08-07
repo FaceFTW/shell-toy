@@ -1,0 +1,49 @@
+{
+	// Use IntelliSense to learn about possible attributes.
+	// Hover to view descriptions of existing attributes.
+	// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug executable 'sh-toy'",
+			"cargo": {
+				"args": [
+					"build",
+					"--bin=sh-toy",
+					"--package=shell-toy"
+				],
+				"filter": {
+					"name": "sh-toy",
+					"kind": "bin"
+				}
+			},
+			"args": [
+				"-c",
+				"./cows/solid-snake.cow",
+				"test"
+			],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in executable 'sh-toy'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--bin=sh-toy",
+					"--package=shell-toy"
+				],
+				"filter": {
+					"name": "sh-toy",
+					"kind": "bin"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		}
+	]
+}

@@ -1,6 +1,7 @@
 use crate::parser::{cow_parser, TerminalCharacter};
 use owo_colors::{OwoColorize, XtermColors};
 use std::{
+    collections::HashMap,
     error::Error,
     fs::{self},
     io::{self, Read},
@@ -170,6 +171,8 @@ impl SpeechBubble {
 //End Derived Code
 /***************************/
 pub fn derive_cow_str(parsed_chars: &[TerminalCharacter]) -> String {
+    let mut environment: HashMap<String, Vec<TerminalCharacter>> = HashMap::new();
+
     //Because colors will change before characters are created, we take an owo_colors style
     // and use it as the "current style under tracking". As we created the string, we apply the style necessary to each character
     let mut current_style = owo_colors::Style::new().default_color();
@@ -206,8 +209,15 @@ pub fn derive_cow_str(parsed_chars: &[TerminalCharacter]) -> String {
             TerminalCharacter::TonguePlaceholder => cow_string = cow_string + "  ",
             TerminalCharacter::Newline => cow_string = cow_string + "\n",
             TerminalCharacter::Comment => (),
-			TerminalCharacter::VarBinding(_, _) => todo!(),
-			TerminalCharacter::BoundVarCall(_) => todo!(),
+            TerminalCharacter::VarBinding(name, val) => {
+                environment.insert(name.to_string(), val.to_vec());
+            }
+            TerminalCharacter::BoundVarCall(binding) => {
+                let binding_val = environment
+                    .get(binding)
+                    .expect("Could not find a binding with the specified name");
+                cow_string = cow_string + derive_cow_str(&binding_val).as_str();
+            }
         }
     }
 

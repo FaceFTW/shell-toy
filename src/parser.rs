@@ -2,7 +2,7 @@
 /// couldn't be me hahahahahahaha
 use nom::{
     branch::alt,
-    bytes::complete::{tag, take, take_till, take_until, take_until1},
+    bytes::complete::{tag, take, take_until, take_until1},
     character::complete::{alphanumeric1, char, digit1, space0},
     combinator::{map, opt},
     error::ParseError,
@@ -193,6 +193,12 @@ fn perl_junk<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, Termina
             tag("$the_cow = <<\"EOC\";\r\n"),
             tag("$the_cow = <<EOC;\n"),
             tag("$the_cow = <<EOC;\r\n"),
+            tag("$the_cow = << EOC;\n"),
+            tag("$the_cow = << EOC;\r\n"),
+            tag("$the_cow = << EOC\n"),
+            tag("$the_cow = << EOC\r\n"),
+            tag("$the_cow = <<EOC\n"),
+            tag("$the_cow = <<EOC\r\n"),
             tag("binmode STDOUT, \":utf8\";\n"),
             tag("binmode STDOUT, \":utf8\";\r\n"),
         )),
