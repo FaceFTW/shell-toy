@@ -206,6 +206,8 @@ pub fn derive_cow_str(parsed_chars: &[TerminalCharacter]) -> String {
             TerminalCharacter::TonguePlaceholder => cow_string = cow_string + "  ",
             TerminalCharacter::Newline => cow_string = cow_string + "\n",
             TerminalCharacter::Comment => (),
+			TerminalCharacter::VarBinding(_, _) => todo!(),
+			TerminalCharacter::BoundVarCall(_) => todo!(),
         }
     }
 
