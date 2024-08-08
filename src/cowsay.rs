@@ -1,6 +1,7 @@
 use crate::parser::{cow_parser, TerminalCharacter};
-use owo_colors::{OwoColorize, XtermColors};
+use owo_colors::{DynColor, OwoColorize, Style, XtermColors};
 use std::{
+    collections::HashMap,
     error::Error,
     fs::{self},
     io::{self, Read},
@@ -169,43 +170,93 @@ impl SpeechBubble {
 /***************************/
 //End Derived Code
 /***************************/
-pub fn derive_cow_str(parsed_chars: &[TerminalCharacter]) -> String {
-    //Because colors will change before characters are created, we take an owo_colors style
-    // and use it as the "current style under tracking". As we created the string, we apply the style necessary to each character
-    let mut current_style = owo_colors::Style::new().default_color();
+//Wrapper type to contain the Style struct so it can be passed recursively
+struct StyleBuffer {
+    inner: Style,
+}
+
+impl StyleBuffer {
+    pub fn new() -> Self {
+        Self {
+            inner: owo_colors::Style::new().default_color().on_default_color(),
+        }
+    }
+
+    pub fn default_color(&mut self) {
+        self.inner = self.inner.default_color()
+    }
+
+    pub fn on_default_color(&mut self) {
+        self.inner = self.inner.on_default_color()
+    }
+
+    pub fn color(&mut self, color: impl DynColor) {
+        self.inner = self.inner.color(color)
+    }
+
+    pub fn on_color(&mut self, color: impl DynColor) {
+        self.inner = self.inner.on_color(color)
+    }
+
+    pub fn truecolor(&mut self, red: u8, green: u8, blue: u8) {
+        self.inner = self.inner.truecolor(red, green, blue)
+    }
+
+    pub fn on_truecolor(&mut self, red: u8, green: u8, blue: u8) {
+        self.inner = self.inner.on_truecolor(red, green, blue)
+    }
+}
+
+fn derive_cow_str(parsed_chars: &[TerminalCharacter], current_style: &mut StyleBuffer) -> String {
+    let mut environment: HashMap<String, Vec<TerminalCharacter>> = HashMap::new();
+
+    let mut cow_started = false;
     //TODO Determine if we should pre-allocate the memory with an "estimate" for performance
     let mut cow_string = String::new();
     for term_char in parsed_chars {
         match term_char {
             TerminalCharacter::Space => {
-                cow_string = cow_string + format!("{}", " ".style(current_style)).as_str()
+                // if cow_started {
+                //Assume first whitespace we see is part of the cow to output
+                cow_string = cow_string + format!("{}", " ".style(current_style.inner)).as_str()
+                // }
             }
-            TerminalCharacter::DefaultForegroundColor => {
-                current_style = current_style.default_color()
-            }
-            TerminalCharacter::DefaultBackgroundColor => {
-                current_style = current_style.on_default_color()
-            }
+            TerminalCharacter::DefaultForegroundColor => current_style.default_color(),
+            TerminalCharacter::DefaultBackgroundColor => current_style.on_default_color(),
             TerminalCharacter::TerminalForegroundColor256(color) => {
-                current_style = current_style.color(XtermColors::from(*color))
+                current_style.color(XtermColors::from(*color))
             }
             TerminalCharacter::TerminalForegroundColorTruecolor(red, green, blue) => {
-                current_style = current_style.truecolor(*red, *green, *blue)
+                current_style.truecolor(*red, *green, *blue)
             }
             TerminalCharacter::TerminalBackgroundColor256(color) => {
-                current_style = current_style.on_color(XtermColors::from(*color))
+                current_style.on_color(XtermColors::from(*color))
             }
             TerminalCharacter::TerminalBackgroundColorTruecolor(red, green, blue) => {
-                current_style = current_style.on_truecolor(*red, *green, *blue);
+                current_style.on_truecolor(*red, *green, *blue);
             }
             TerminalCharacter::UnicodeCharacter(uchar) => {
-                cow_string = cow_string + format!("{}", uchar.style(current_style)).as_str()
+                cow_string = cow_string + format!("{}", uchar.style(current_style.inner)).as_str()
             }
             TerminalCharacter::ThoughtPlaceholder => cow_string = cow_string + "\\",
             TerminalCharacter::EyePlaceholder => cow_string = cow_string + "o o",
             TerminalCharacter::TonguePlaceholder => cow_string = cow_string + "  ",
-            TerminalCharacter::Newline => cow_string = cow_string + "\n",
+            TerminalCharacter::Newline => {
+                if cow_started {
+                    cow_string = cow_string + "\n";
+                }
+            }
             TerminalCharacter::Comment => (),
+            TerminalCharacter::VarBinding(name, val) => {
+                environment.insert(name.to_string(), val.to_vec());
+            }
+            TerminalCharacter::BoundVarCall(binding) => {
+                let binding_val = environment
+                    .get(binding)
+                    .expect("Could not find a binding with the specified name");
+                cow_string = cow_string + derive_cow_str(&binding_val, current_style).as_str();
+            }
+            TerminalCharacter::CowStart => cow_started = true,
         }
     }
 
@@ -215,7 +266,14 @@ pub fn derive_cow_str(parsed_chars: &[TerminalCharacter]) -> String {
 //Effectively a main function in the sense it does all the heavy lifting.
 pub fn print_cowsay(cowsay: &str, bubble: SpeechBubble, msg: &str) {
     let mut nom_it = nom::combinator::iterator(cowsay, cow_parser);
-    let cow_str = derive_cow_str(nom_it.collect::<Vec<TerminalCharacter>>().as_slice());
+
+    //Because colors will change before characters are created, we take an owo_colors style
+    // and use it as the "current style under tracking". As we created the string, we apply the style necessary to each character
+    let mut style_buffer = StyleBuffer::new();
+    let cow_str = derive_cow_str(
+        nom_it.collect::<Vec<TerminalCharacter>>().as_slice(),
+        &mut style_buffer,
+    );
     // parse_raw_cow(cowsay, false);
     let msg_str = bubble
         .create(msg, 64 as usize)
