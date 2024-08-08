@@ -12,7 +12,7 @@ name = "sh-toy"
 path = "src/main.rs"
 
 [dependencies]
-owo-colors = "3"
+owo-colors = "4"
 nom = "7"
 tinyrand = "0.5"
 getrandom = "0.2"
