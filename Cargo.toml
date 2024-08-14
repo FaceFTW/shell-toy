@@ -5,7 +5,7 @@ edition = "2021"
 description = "A \"cowsay | fortune\" implementation in Rust, i.e. a nice little toy to liven up your shell."
 license = "MIT"
 repository = "https://github.com/FaceFTW/shell-toy"
-keywords = ["terminal","customization","fortune","cowsay","fortune-cookie"]
+keywords = ["terminal", "customization", "fortune", "cowsay", "fortune-cookie"]
 
 [[bin]]
 name = "sh-toy"
@@ -22,6 +22,7 @@ strip-ansi-escapes = "0.2"
 unicode-width = "0.1"
 
 [features]
+inline = []
 
 [profile.release]
 codegen-units = 1
