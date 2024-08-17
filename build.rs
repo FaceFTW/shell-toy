@@ -11,7 +11,7 @@ fn main() -> Result<(), io::Error> {
     create_fortune_db()
 }
 
-///
+#[cfg(not(feature = "fortune-git"))]
 fn create_fortune_db() -> Result<(), io::Error> {
     if let Err(_) = fs::read_dir("target/resources") {
         fs::create_dir("target/resources")?
@@ -33,12 +33,21 @@ fn create_fortune_db() -> Result<(), io::Error> {
     }
 }
 
+#[cfg(feature = "fortune-git")]
+fn create_fortune_db() -> Result<(), io::Error> {
+    if let Err(_) = fs::read_dir("target/resources") {
+        fs::create_dir("target/resources")?
+    }
+
+    gen_concat_fortune_files("./fortunes/fortune-mod/datfiles".to_string())
+}
+
 fn gen_concat_fortune_files(val: String) -> Result<(), io::Error> {
     println!("cargo::rerun-if-changed={val}");
     let (fortune_list, offensive_list) = fortune_list_iterate(&PathBuf::from(val), false);
     let concat_fortunes = concat_fortune_files(fortune_list.as_slice())?;
     let off_concat_fortunes = concat_fortune_files(offensive_list.as_slice())?;
-
+    println!("{:#?}", offensive_list.as_slice());
     match File::create("target/resources/fortunes") {
         Ok(mut file) => {
             let _ = file.write_all(concat_fortunes.trim().as_bytes())?;
@@ -58,7 +67,7 @@ fn gen_concat_fortune_files(val: String) -> Result<(), io::Error> {
 
 //Used LazyCell because We use this in an OsStr comparison context
 //Adds effectively an O(1) operation based on my understanding
-pub const ILLEGAL_FILE_SUFFIXES: LazyCell<[&OsStr; 13]> = LazyCell::new(|| {
+pub const ILLEGAL_FILE_SUFFIXES: LazyCell<[&OsStr; 16]> = LazyCell::new(|| {
     [
         OsStr::new("dat"),
         OsStr::new("pos"),
@@ -73,6 +82,9 @@ pub const ILLEGAL_FILE_SUFFIXES: LazyCell<[&OsStr; 13]> = LazyCell::new(|| {
         OsStr::new("ins.pas"),
         OsStr::new("ins.ftn"),
         OsStr::new("sml"),
+        OsStr::new("sh"),
+        OsStr::new("pl"),
+        OsStr::new("csv"),
     ]
 });
 
@@ -89,15 +101,17 @@ fn fortune_list_iterate(path: &PathBuf, is_offensive: bool) -> (Vec<PathBuf>, Ve
                 .path()
                 .extension()
                 .unwrap_or_default(),
-        )
+        ) &&
+		//Additional condition to ignore the CMakeLists.txt file specifically in fortune-mod
+		!item.as_ref().unwrap().path().ends_with("CMakeLists.txt")
     }) {
         match entry {
             Ok(item) => match item.metadata().unwrap().is_dir() {
                 true => {
-                    if item.file_name() == "./off" {
+                    if item.file_name() == "off" {
                         offensive_list.append(&mut fortune_list_iterate(&item.path(), true).1)
                     } else {
-                        let vecs = &mut fortune_list_iterate(&item.path(), false);
+                        let vecs = &mut fortune_list_iterate(&item.path(), is_offensive);
                         fortune_list.append(&mut vecs.0);
                         offensive_list.append(&mut vecs.1);
                     }
