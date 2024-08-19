@@ -20,11 +20,14 @@ argh = "0.1"
 textwrap = "0.16"
 strip-ansi-escapes = "0.2"
 unicode-width = "0.1"
-
+cfg-if = "1"
 
 [features]
+default=["inline", "fortune-git"]
 inline = []
 fortune-git = []
+
+
 
 [profile.release]
 codegen-units = 1

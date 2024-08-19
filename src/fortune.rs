@@ -1,4 +1,3 @@
-// use rand::{seq::IteratorRandom, thread_rng};
 use std::{
     cell::LazyCell,
     error::Error,
@@ -9,17 +8,8 @@ use std::{
 };
 use tinyrand::Rand;
 
-// struct Flags {
-//     pub sflag: bool, //silent run
-//     pub oflag: bool, //ordering
-//     pub iflag: bool, //ignore case flag
-//     pub rflag: bool, //randomize order
-//     pub xflag: bool, //set rotated bit
-// }
-
 //default method of getting a fortune, without using the index file.
-pub fn get_fortune(file_path: &PathBuf, rng: &mut impl Rand) -> Result<String, Box<dyn Error>> {
-    // let mut rng = thread_rng();
+pub fn get_fortune(file_path: PathBuf, rng: &mut impl Rand) -> Result<String, Box<dyn Error>> {
     match File::open(file_path) {
         Ok(mut file) => {
             let mut string_buf = String::new();
@@ -32,9 +22,39 @@ pub fn get_fortune(file_path: &PathBuf, rng: &mut impl Rand) -> Result<String, B
     }
 }
 
-pub fn choose_fortune_file(include_offensive: bool, rng: &mut impl Rand) -> PathBuf {
+#[cfg(feature = "inline")]
+pub fn get_inline_fortune(
+    rng: &mut impl Rand,
+    include_offensive: bool,
+) -> Result<String, Box<dyn Error>> {
+    const INLINE_FORTUNES: &'static str = include_str!("../target/resources/fortunes");
+    const OFF_FORTUNES: &'static str = include_str!("../target/resources/off_fortunes");
+
+    let fortune_split: Vec<&str> = INLINE_FORTUNES
+        .split("\n%\n")
+        .into_iter()
+        .chain(match include_offensive {
+            true => OFF_FORTUNES.split("\n%\n").into_iter(),
+            false => "".split(""), //HACK iterator generics got yucky
+        })
+        .collect();
+    let chosen_idx = rng.next_lim_usize(fortune_split.len());
+    Ok(fortune_split[chosen_idx].to_string())
+}
+
+pub fn choose_fortune_file(
+    include_offensive: bool,
+    rng: &mut impl Rand,
+    supplied_path: Option<String>,
+) -> PathBuf {
     let os = std::env::consts::OS;
-    if let Ok(val) = std::env::var("FORTUNE_FILE") {
+    if let Some(val) = supplied_path {
+        match fs::metadata(&val).unwrap().is_dir() {
+            true => choose_random_fortune_file(&PathBuf::from(val), include_offensive, rng)
+                .expect("Could not read the specified directory for getting fortunes"),
+            false => PathBuf::from(val),
+        }
+    } else if let Ok(val) = std::env::var("FORTUNE_FILE") {
         PathBuf::from(val.as_str())
     } else if let Ok(val) = std::env::var("FORTUNE_PATH") {
         choose_random_fortune_file(&PathBuf::from(val.as_str()), include_offensive, rng)
