@@ -21,15 +21,17 @@ pub fn get_fortune(file_path: PathBuf, rng: &mut impl Rand) -> Result<String, Bo
         Err(e) => panic!("Could not open Fortune file! {e}"),
     }
 }
+#[cfg(feature = "inline")]
+const INLINE_FORTUNES: &'static str = include_str!("../target/resources/fortunes");
+#[cfg(feature = "inline")]
+const OFF_FORTUNES: &'static str = include_str!("../target/resources/off_fortunes");
 
 #[cfg(feature = "inline")]
 pub fn get_inline_fortune(
     rng: &mut impl Rand,
     include_offensive: bool,
 ) -> Result<String, Box<dyn Error>> {
-    const INLINE_FORTUNES: &'static str = include_str!("../target/resources/fortunes");
-    const OFF_FORTUNES: &'static str = include_str!("../target/resources/off_fortunes");
-
+    //This is a fun little test
     let fortune_split: Vec<&str> = INLINE_FORTUNES
         .split("\n%\n")
         .into_iter()

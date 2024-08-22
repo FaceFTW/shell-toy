@@ -45,8 +45,9 @@ fn create_fortune_db() -> Result<(), io::Error> {
 fn gen_concat_fortune_files(val: String) -> Result<(), io::Error> {
     println!("cargo::rerun-if-changed={val}");
     let (fortune_list, offensive_list) = fortune_list_iterate(&PathBuf::from(val), false);
-    let concat_fortunes = concat_fortune_files(fortune_list.as_slice())?;
-    let off_concat_fortunes = concat_fortune_files(offensive_list.as_slice())?;
+    let concat_fortunes = concat_fortune_files(fortune_list.as_slice())?.replace("\r\n", "\n");
+    let off_concat_fortunes =
+        concat_fortune_files(offensive_list.as_slice())?.replace("\r\n", "\n");
     println!("{:#?}", offensive_list.as_slice());
     match File::create("target/resources/fortunes") {
         Ok(mut file) => {
