@@ -1,6 +1,6 @@
 [package]
 name = "shell-toy"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 description = "A \"cowsay | fortune\" implementation in Rust, i.e. a nice little toy to liven up your shell."
 license = "MIT"
@@ -23,8 +23,9 @@ unicode-width = "0.1"
 cfg-if = "1"
 
 [features]
-default=[]
+default = []
 inline = []
+inline-off = []
 fortune-git = []
 
 
