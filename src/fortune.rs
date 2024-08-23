@@ -66,7 +66,7 @@ pub fn choose_fortune_file(
             .expect("Could not choose a random fortune file from the specified Fortune Path")
     } else {
         match os{
-            "linux" => PathBuf::from("/usr/share/games/fortune"),
+            "linux" => choose_fortune_file(include_offensive, rng,Some(String::from("/usr/share/games/fortunes"))),
             _ => panic!("I don't know what the default path for fortunes are for this OS!.\nPlease provide a FORTUNEPATH or FORTUNE_PATH environment variable, or a single file with FORTUNE_FILE")
         }
     }

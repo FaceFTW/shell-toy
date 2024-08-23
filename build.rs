@@ -27,7 +27,7 @@ fn create_fortune_db() -> Result<(), io::Error> {
         gen_concat_fortune_files(val)
     } else {
         match std::env::consts::OS{
-            "linux" => gen_concat_fortune_files(String::from("/usr/share/games/fortune")),
+            "linux" => gen_concat_fortune_files(String::from("/usr/share/games/fortunes")),
             _ => panic!("I don't know what the default path for fortunes are for this OS!.\nPlease provide a FORTUNEPATH or FORTUNE_PATH environment variable, or a single file with FORTUNE_FILE")
         }
     }

@@ -7,7 +7,9 @@ use std::{fs::File, io::Read, path::PathBuf};
 
 use cli::Options;
 use cowsay::{choose_random_cow, identify_cow_path, print_cowsay, SpeechBubble};
-use fortune::{choose_fortune_file, get_fortune, get_inline_fortune};
+#[cfg(feature = "inline")]
+use fortune::get_inline_fortune;
+use fortune::{choose_fortune_file, get_fortune};
 use tinyrand::{Seeded, StdRand};
 
 fn main() {

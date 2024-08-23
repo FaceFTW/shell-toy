@@ -23,7 +23,7 @@ unicode-width = "0.1"
 cfg-if = "1"
 
 [features]
-default=["inline", "fortune-git"]
+default=[]
 inline = []
 fortune-git = []
 
