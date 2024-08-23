@@ -23,8 +23,10 @@ pub fn get_fortune(file_path: PathBuf, rng: &mut impl Rand) -> Result<String, Bo
 }
 #[cfg(feature = "inline")]
 const INLINE_FORTUNES: &'static str = include_str!("../target/resources/fortunes");
-#[cfg(feature = "inline")]
+#[cfg(all(feature = "inline", feature = "inline-off"))]
 const OFF_FORTUNES: &'static str = include_str!("../target/resources/off_fortunes");
+// #[cfg(all(feature = "inline", not(feature = "inline-off")))]
+// const OFF_FORTUNES: &'static str = "";
 
 #[cfg(feature = "inline")]
 pub fn get_inline_fortune(
@@ -32,13 +34,22 @@ pub fn get_inline_fortune(
     include_offensive: bool,
 ) -> Result<String, Box<dyn Error>> {
     //This is a fun little test
+    cfg_if::cfg_if! {
+        if #[cfg(feature="inline-off")] {
+            let off_iterator = match include_offensive {
+                true => OFF_FORTUNES.split("\n%\n").into_iter(),
+                false => "".split(""), //HACK iterator generics got yucky
+            };
+        } else {
+            let _off = include_offensive;   //discard binding
+            let off_iterator = "".split("");
+        }
+    }
+
     let fortune_split: Vec<&str> = INLINE_FORTUNES
         .split("\n%\n")
         .into_iter()
-        .chain(match include_offensive {
-            true => OFF_FORTUNES.split("\n%\n").into_iter(),
-            false => "".split(""), //HACK iterator generics got yucky
-        })
+        .chain(off_iterator)
         .collect();
     let chosen_idx = rng.next_lim_usize(fortune_split.len());
     Ok(fortune_split[chosen_idx].to_string())
