@@ -7,6 +7,8 @@ use std::{fs::File, io::Read, path::PathBuf};
 
 use cli::Options;
 use cowsay::{choose_random_cow, identify_cow_path, print_cowsay, SpeechBubble};
+#[cfg(feature = "inline")]
+use fortune::get_inline_fortune;
 use fortune::{choose_fortune_file, get_fortune};
 use tinyrand::{Seeded, StdRand};
 
@@ -43,15 +45,24 @@ fn main() {
     let cow_msg = match options.message {
         Some(msg) => msg,
         None => {
-            let fortune_file = choose_fortune_file(options.include_offensive, &mut rng);
-            get_fortune(&fortune_file, &mut rng)
+            cfg_if::cfg_if! {
+                if #[cfg(feature="inline")]{
+                    if let Some(path) = options.fortune_file{
+                        let fortune_file = choose_fortune_file(options.include_offensive, &mut rng, Some(path) );
+                        get_fortune(fortune_file, &mut rng)
+                            .expect("Could not get a fortune, your future is shrouded in mystery...")
+                    } else {
+                        get_inline_fortune(&mut rng, options.include_offensive)
+                            .expect("Could not read internal fortune index, your future is shrouded in mystery...")
+                    }
+                } else {
+                    let fortune_file = choose_fortune_file(options.include_offensive, &mut rng, options.fortune_file );
+                    get_fortune(fortune_file, &mut rng)
                 .expect("Could not get a fortune, your future is shrouded in mystery...")
+                }
+            }
         }
     };
 
-    print_cowsay(
-        &cow_str,
-        SpeechBubble::new(options.bubble_type),
-        &cow_msg,
-    );
+    print_cowsay(&cow_str, SpeechBubble::new(options.bubble_type), &cow_msg);
 }

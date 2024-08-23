@@ -19,11 +19,7 @@
 					"kind": "bin"
 				}
 			},
-			"args": [
-				"-c",
-				"./cows/solid-snake.cow",
-				"test"
-			],
+			"args": [],
 			"cwd": "${workspaceFolder}"
 		},
 		{

@@ -29,6 +29,11 @@ pub(crate) struct Options {
 
     #[argh(positional)]
     pub message: Option<String>,
+
+    // #[cfg(feature = "inline")]
+    #[argh(option, short = 'f', long = "fortune-file")]
+    ///instead of using internal fortunes, which file/dir to look in
+    pub fortune_file: Option<String>,
 }
 
 fn parse_bubble_type(value: &str) -> Result<BubbleType, String> {
