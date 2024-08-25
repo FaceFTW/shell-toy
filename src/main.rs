@@ -7,7 +7,7 @@ use std::{fs::File, io::Read, path::PathBuf};
 
 use cli::Options;
 use cowsay::{choose_random_cow, identify_cow_path, print_cowsay, SpeechBubble};
-#[cfg(feature = "inline")]
+#[cfg(feature = "inline-fortune")]
 use fortune::get_inline_fortune;
 use fortune::{choose_fortune_file, get_fortune};
 use tinyrand::{Seeded, StdRand};
@@ -46,7 +46,7 @@ fn main() {
         Some(msg) => msg,
         None => {
             cfg_if::cfg_if! {
-                if #[cfg(feature="inline")]{
+                if #[cfg(feature="inline-fortune")]{
                     if let Some(path) = options.fortune_file{
                         let fortune_file = choose_fortune_file(options.include_offensive, &mut rng, Some(path) );
                         get_fortune(fortune_file, &mut rng)

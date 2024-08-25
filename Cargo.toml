@@ -24,9 +24,10 @@ cfg-if = "1"
 
 [features]
 default = []
-inline = []
-inline-off = []
+inline-fortune = []
+inline-off-fortune = []
 fortune-git = []
+inline-cowsay = []
 
 
 [profile.release]

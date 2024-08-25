@@ -19,8 +19,8 @@ This will install shell-toy to your local path as `sh-toy`. You can then put it 
 There are some compile-time features that enable shell-toy to perform certain things such as using an internal copy of fortunes embedded in the executable. This can be customized based on what you want. More details are below:
 | Feature       | Description                                                                                                                                           |
 | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `inline`      | Enables inlining fortunes in the compiled `sh-toy` executable. See [Compiling with inline fortunes](#compiling-with-inline-fortunes) for more details |
-| `inline-off`  | Also inlines Offensive fortunes. These are still blocked behind the `-o` flag                                                                         |
+| `inline-fortune`      | Enables inlining fortunes in the compiled `sh-toy` executable. See [Compiling with inline fortunes](#compiling-with-inline-fortunes) for more details |
+| `inline-off-fortune`  | Also inlines Offensive fortunes. These are still blocked behind the `-o` flag                                                                         |
 | `fortune-git` | Only uses the fortunes from the [`fortune-mod`](https://github.com/shlomif/fortune-mod) repository. Expects the submodule in the repo to be cloned    |
 
 ### Compiling with Inline Fortunes
