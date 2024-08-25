@@ -22,12 +22,18 @@ strip-ansi-escapes = "0.2"
 unicode-width = "0.1"
 cfg-if = "1"
 
+[build-dependencies]
+quote = "1"
+cfg-if = "1"
+
+
 [features]
-default = []
+default = ["inline-fortune"]
 inline-fortune = []
 inline-off-fortune = []
 fortune-git = []
 inline-cowsay = []
+cowsay-git = []
 
 
 [profile.release]

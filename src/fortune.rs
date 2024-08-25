@@ -35,7 +35,7 @@ pub fn get_inline_fortune(
 ) -> Result<String, Box<dyn Error>> {
     //This is a fun little test
     cfg_if::cfg_if! {
-        if #[cfg(feature="inline-off")] {
+        if #[cfg(feature="inline-off-fortune")] {
             let off_iterator = match include_offensive {
                 true => OFF_FORTUNES.split("\n%\n").into_iter(),
                 false => "".split(""), //HACK iterator generics got yucky
