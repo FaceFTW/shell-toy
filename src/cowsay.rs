@@ -24,57 +24,6 @@ pub enum BubbleType {
     Cowsay,
 }
 
-const THINK_BUBBLE: SpeechBubble = SpeechBubble {
-    corner_top_left: "(",
-    top: "⁀",
-    corner_top_right: ")\n",
-    top_right: "  )\n",
-    right: "  )\n",
-    bottom_right: "  )\n",
-    corner_bottom_right: ")\n",
-    bottom: "‿",
-    corner_bottom_left: "(",
-    bottom_left: "(  ",
-    left: "(  ",
-    top_left: "(  ",
-    short_left: "(  ",
-    short_right: "  )\n",
-};
-
-const ROUND_BUBBLE: SpeechBubble = SpeechBubble {
-    corner_top_left: "╭",
-    top: "─",
-    corner_top_right: "╮\n",
-    top_right: "  │\n",
-    right: "  │\n",
-    bottom_right: "  │\n",
-    corner_bottom_right: "╯\n",
-    bottom: "─",
-    corner_bottom_left: "╰",
-    bottom_left: "│  ",
-    left: "│  ",
-    top_left: "│  ",
-    short_left: "│  ",
-    short_right: "  │\n",
-};
-
-const COWSAY_BUBBLE: SpeechBubble = SpeechBubble {
-    corner_top_left: " ",
-    top: "_",
-    corner_top_right: " \n",
-    top_right: "  \\\n",
-    right: "  |\n",
-    bottom_right: "  /\n",
-    corner_bottom_right: " \n",
-    bottom: "-",
-    corner_bottom_left: " ",
-    bottom_left: "\\  ",
-    left: "|  ",
-    top_left: "/  ",
-    short_left: "<  ",
-    short_right: "  >\n",
-};
-
 #[derive(Debug, Clone)]
 pub struct SpeechBubble {
     corner_top_left: &'static str,
@@ -92,6 +41,42 @@ pub struct SpeechBubble {
     short_left: &'static str,
     short_right: &'static str,
 }
+
+macro_rules! speech_bubble {
+    ($ctl:literal, $t:literal, $ctr:literal, $tr:literal, $r:literal, $br:literal, $cbr: literal, $b:literal, $cbl:literal,$bl:literal, $l:literal, $tl:literal, $sl:literal, $sr:literal ) => {
+        SpeechBubble {
+            corner_top_left: $ctl,
+            top: $t,
+            corner_top_right: $ctr,
+            top_right: $tr,
+            right: $r,
+            bottom_right: $br,
+            corner_bottom_right: $cbr,
+            bottom: $b,
+            corner_bottom_left: $cbl,
+            bottom_left: $bl,
+            left: $l,
+            top_left: $tl,
+            short_left: $sl,
+            short_right: $sr,
+        }
+    };
+}
+
+const THINK_BUBBLE: SpeechBubble = speech_bubble!(
+    "(", "⁀", ")\n", "  )\n", "  )\n", "  )\n", ")\n", "‿", "(", "(  ", "(  ", "(  ", "(  ",
+    "  )\n"
+);
+
+const ROUND_BUBBLE: SpeechBubble = speech_bubble!(
+    "╭", "─", "╮\n", "  │\n", "  │\n", "  │\n", "╯\n", "─", "╰", "│  ", "│  ", "│  ", "│  ",
+    "  │\n"
+);
+
+const COWSAY_BUBBLE: SpeechBubble = speech_bubble!(
+    " ", "_", " \n", "  \\\n", "  |\n", "  /\n", " \n", "-", " ", "\\  ", "|  ", "/  ", "<  ",
+    "  >\n"
+);
 
 impl SpeechBubble {
     pub fn new(bubble_type: BubbleType) -> Self {
