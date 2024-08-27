@@ -6,7 +6,9 @@ mod parser;
 use std::{fs::File, io::Read, path::PathBuf};
 
 use cli::Options;
-use cowsay::{choose_random_cow, identify_cow_path, print_cowsay, SpeechBubble};
+#[cfg(not(feature = "inline-cowsay"))]
+use cowsay::identify_cow_path;
+use cowsay::{choose_random_cow, print_cowsay, SpeechBubble};
 #[cfg(feature = "inline-fortune")]
 use fortune::get_inline_fortune;
 use fortune::{choose_fortune_file, get_fortune};
@@ -33,12 +35,19 @@ fn main() {
             }
         }
         options if options.cow_path.is_some() => choose_random_cow(
-            &PathBuf::from(options.cow_path.as_deref().unwrap()),
+            &Some(PathBuf::from(options.cow_path.as_deref().unwrap())),
             &mut rng,
         ),
         _ => {
-            let cow_path = identify_cow_path();
-            choose_random_cow(&cow_path, &mut rng)
+            cfg_if::cfg_if! {
+                if #[cfg(feature="inline-cowsay")]{
+                    choose_random_cow(&None, &mut rng)
+                } else {
+                    let cow_path = identify_cow_path();
+                    choose_random_cow(Some(&cow_path), &mut rng)
+
+                }
+            }
         }
     };
 

@@ -1,4 +1,5 @@
 use crate::parser::{cow_parser, TerminalCharacter};
+use cfg_if::cfg_if;
 use owo_colors::{DynColor, OwoColorize, Style, XtermColors};
 use std::{
     collections::HashMap,
@@ -170,6 +171,9 @@ impl SpeechBubble {
 /***************************/
 //End Derived Code
 /***************************/
+#[cfg(feature = "inline-cowsay")]
+include!("../target/generated_sources/cow_literals.rs");
+
 //Wrapper type to contain the Style struct so it can be passed recursively
 struct StyleBuffer {
     inner: Style,
@@ -282,6 +286,7 @@ pub fn print_cowsay(cowsay: &str, bubble: SpeechBubble, msg: &str) {
     println!("{msg_str}{cow_str}")
 }
 
+#[cfg(not(feature = "inline-cowsay"))]
 fn get_list_of_cows(path: &PathBuf) -> Result<Vec<String>, io::Error> {
     let mut total_list = vec![];
     let dir_list = fs::read_dir(path)?;
@@ -302,23 +307,31 @@ fn get_list_of_cows(path: &PathBuf) -> Result<Vec<String>, io::Error> {
     Ok(total_list)
 }
 
-pub fn choose_random_cow(cow_path: &PathBuf, rng: &mut impl Rand) -> String {
-    // let mut rng = thread_rng();
-    let cow_list = get_list_of_cows(cow_path).expect("Could not open the cow path");
-    let chosen_idx = rng.next_lim_usize(cow_list.len());
+pub fn choose_random_cow(cow_path: &Option<PathBuf>, rng: &mut impl Rand) -> String {
+    cfg_if! {
+    if #[cfg(feature="inline-cowsay")]{
+        let _ = cow_path;
+        let chosen_idx = rng.next_lim_usize(COW_DATA.len());
+        COW_DATA[chosen_idx].1.to_string()
+    } else {
+        let cow_list = get_list_of_cows(cow_path).expect("Could not open the cow path");
+        let chosen_idx = rng.next_lim_usize(cow_list.len());
 
-    let chosen_path = &cow_list[chosen_idx];
-    match fs::File::open(chosen_path) {
-        Ok(mut file) => {
-            let mut cow_str = String::new();
-            file.read_to_string(&mut cow_str)
-                .expect("Error reading cow string");
-            cow_str
+        let chosen_path = &cow_list[chosen_idx];
+        match fs::File::open(chosen_path) {
+            Ok(mut file) => {
+                let mut cow_str = String::new();
+                file.read_to_string(&mut cow_str)
+                    .expect("Error reading cow string");
+                cow_str
+            }
+            Err(e) => panic!("{e}"),
         }
-        Err(e) => panic!("{e}"),
+    }
     }
 }
 
+#[cfg(not(feature = "inline-cowsay"))]
 pub fn identify_cow_path() -> PathBuf {
     //Check if we have an environment variable defined:
     let os = std::env::consts::OS;
