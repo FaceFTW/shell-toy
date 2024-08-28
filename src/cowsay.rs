@@ -246,6 +246,9 @@ fn derive_cow_str(parsed_chars: &[TerminalCharacter], current_style: &mut StyleB
                 cow_string = cow_string + derive_cow_str(&binding_val, current_style).as_str();
             }
             TerminalCharacter::CowStart => cow_started = true,
+            TerminalCharacter::EscapedUnicodeCharacter(character) => {
+                cow_string = cow_string + character.to_string().as_str();
+            }
         }
     }
 
@@ -271,27 +274,6 @@ pub fn print_cowsay(cowsay: &str, bubble: SpeechBubble, msg: &str) {
     println!("{msg_str}{cow_str}")
 }
 
-#[cfg(not(feature = "inline-cowsay"))]
-fn get_list_of_cows(path: &PathBuf) -> Result<Vec<String>, io::Error> {
-    let mut total_list = vec![];
-    let dir_list = fs::read_dir(path)?;
-    for entry in dir_list {
-        match entry {
-            Ok(item) => match item.metadata()?.is_dir() {
-                true => total_list.append(get_list_of_cows(&item.path()).unwrap().as_mut()),
-                false => {
-                    if item.path().extension().unwrap() == "cow" {
-                        total_list.push(item.path().to_str().unwrap().to_string());
-                    }
-                }
-            },
-            Err(e) => return Err(e),
-        }
-    }
-
-    Ok(total_list)
-}
-
 pub fn choose_random_cow(cow_path: &Option<PathBuf>, rng: &mut impl Rand) -> String {
     cfg_if! {
     if #[cfg(feature="inline-cowsay")]{
@@ -299,7 +281,28 @@ pub fn choose_random_cow(cow_path: &Option<PathBuf>, rng: &mut impl Rand) -> Str
         let chosen_idx = rng.next_lim_usize(COW_DATA.len());
         COW_DATA[chosen_idx].1.to_string()
     } else {
+        fn get_list_of_cows(path: &PathBuf) -> Result<Vec<String>, io::Error> {
+            let mut total_list = vec![];
+            let dir_list = fs::read_dir(path)?;
+            for entry in dir_list {
+                match entry {
+                    Ok(item) => match item.metadata()?.is_dir() {
+                        true => total_list.append(get_list_of_cows(&item.path()).unwrap().as_mut()),
+                        false => {
+                            if item.path().extension().unwrap() == "cow" {
+                                total_list.push(item.path().to_str().unwrap().to_string());
+                            }
+                        }
+                    },
+                    Err(e) => return Err(e),
+                }
+            }
+
+            Ok(total_list)
+        }
+
         let cow_list = get_list_of_cows(cow_path).expect("Could not open the cow path");
+
         let chosen_idx = rng.next_lim_usize(cow_list.len());
 
         let chosen_path = &cow_list[chosen_idx];
