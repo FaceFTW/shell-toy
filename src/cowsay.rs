@@ -1,13 +1,7 @@
 use crate::parser::{cow_parser, TerminalCharacter};
+use cfg_if::cfg_if;
 use owo_colors::{DynColor, OwoColorize, Style, XtermColors};
-use std::{
-    collections::HashMap,
-    error::Error,
-    fs::{self},
-    io::{self, Read},
-    path::PathBuf,
-    str::from_utf8,
-};
+use std::{collections::HashMap, error::Error, path::PathBuf, str::from_utf8};
 use strip_ansi_escapes::strip;
 use textwrap::fill;
 use tinyrand::Rand;
@@ -22,57 +16,6 @@ pub enum BubbleType {
     Round,
     Cowsay,
 }
-
-const THINK_BUBBLE: SpeechBubble = SpeechBubble {
-    corner_top_left: "(",
-    top: "⁀",
-    corner_top_right: ")\n",
-    top_right: "  )\n",
-    right: "  )\n",
-    bottom_right: "  )\n",
-    corner_bottom_right: ")\n",
-    bottom: "‿",
-    corner_bottom_left: "(",
-    bottom_left: "(  ",
-    left: "(  ",
-    top_left: "(  ",
-    short_left: "(  ",
-    short_right: "  )\n",
-};
-
-const ROUND_BUBBLE: SpeechBubble = SpeechBubble {
-    corner_top_left: "╭",
-    top: "─",
-    corner_top_right: "╮\n",
-    top_right: "  │\n",
-    right: "  │\n",
-    bottom_right: "  │\n",
-    corner_bottom_right: "╯\n",
-    bottom: "─",
-    corner_bottom_left: "╰",
-    bottom_left: "│  ",
-    left: "│  ",
-    top_left: "│  ",
-    short_left: "│  ",
-    short_right: "  │\n",
-};
-
-const COWSAY_BUBBLE: SpeechBubble = SpeechBubble {
-    corner_top_left: " ",
-    top: "_",
-    corner_top_right: " \n",
-    top_right: "  \\\n",
-    right: "  |\n",
-    bottom_right: "  /\n",
-    corner_bottom_right: " \n",
-    bottom: "-",
-    corner_bottom_left: " ",
-    bottom_left: "\\  ",
-    left: "|  ",
-    top_left: "/  ",
-    short_left: "<  ",
-    short_right: "  >\n",
-};
 
 #[derive(Debug, Clone)]
 pub struct SpeechBubble {
@@ -91,6 +34,42 @@ pub struct SpeechBubble {
     short_left: &'static str,
     short_right: &'static str,
 }
+
+macro_rules! speech_bubble {
+    ($ctl:literal, $t:literal, $ctr:literal, $tr:literal, $r:literal, $br:literal, $cbr: literal, $b:literal, $cbl:literal,$bl:literal, $l:literal, $tl:literal, $sl:literal, $sr:literal ) => {
+        SpeechBubble {
+            corner_top_left: $ctl,
+            top: $t,
+            corner_top_right: $ctr,
+            top_right: $tr,
+            right: $r,
+            bottom_right: $br,
+            corner_bottom_right: $cbr,
+            bottom: $b,
+            corner_bottom_left: $cbl,
+            bottom_left: $bl,
+            left: $l,
+            top_left: $tl,
+            short_left: $sl,
+            short_right: $sr,
+        }
+    };
+}
+
+const THINK_BUBBLE: SpeechBubble = speech_bubble!(
+    "(", "⁀", ")\n", "  )\n", "  )\n", "  )\n", ")\n", "‿", "(", "(  ", "(  ", "(  ", "(  ",
+    "  )\n"
+);
+
+const ROUND_BUBBLE: SpeechBubble = speech_bubble!(
+    "╭", "─", "╮\n", "  │\n", "  │\n", "  │\n", "╯\n", "─", "╰", "│  ", "│  ", "│  ", "│  ",
+    "  │\n"
+);
+
+const COWSAY_BUBBLE: SpeechBubble = speech_bubble!(
+    " ", "_", " \n", "  \\\n", "  |\n", "  /\n", " \n", "-", " ", "\\  ", "|  ", "/  ", "<  ",
+    "  >\n"
+);
 
 impl SpeechBubble {
     pub fn new(bubble_type: BubbleType) -> Self {
@@ -170,6 +149,9 @@ impl SpeechBubble {
 /***************************/
 //End Derived Code
 /***************************/
+#[cfg(feature = "inline-cowsay")]
+include!("../target/generated_sources/cow_literals.rs");
+
 //Wrapper type to contain the Style struct so it can be passed recursively
 struct StyleBuffer {
     inner: Style,
@@ -257,6 +239,9 @@ fn derive_cow_str(parsed_chars: &[TerminalCharacter], current_style: &mut StyleB
                 cow_string = cow_string + derive_cow_str(&binding_val, current_style).as_str();
             }
             TerminalCharacter::CowStart => cow_started = true,
+            TerminalCharacter::EscapedUnicodeCharacter(character) => {
+                cow_string = cow_string + character.to_string().as_str();
+            }
         }
     }
 
@@ -282,43 +267,56 @@ pub fn print_cowsay(cowsay: &str, bubble: SpeechBubble, msg: &str) {
     println!("{msg_str}{cow_str}")
 }
 
-fn get_list_of_cows(path: &PathBuf) -> Result<Vec<String>, io::Error> {
-    let mut total_list = vec![];
-    let dir_list = fs::read_dir(path)?;
-    for entry in dir_list {
-        match entry {
-            Ok(item) => match item.metadata()?.is_dir() {
-                true => total_list.append(get_list_of_cows(&item.path()).unwrap().as_mut()),
-                false => {
-                    if item.path().extension().unwrap() == "cow" {
-                        total_list.push(item.path().to_str().unwrap().to_string());
-                    }
+pub fn choose_random_cow(cow_path: &Option<PathBuf>, rng: &mut impl Rand) -> String {
+    cfg_if! {
+    if #[cfg(feature="inline-cowsay")]{
+        let _ = cow_path;
+        let chosen_idx = rng.next_lim_usize(COW_DATA.len());
+        COW_DATA[chosen_idx].1.to_string()
+    } else {
+        fn get_list_of_cows(path: &PathBuf) -> Result<Vec<String>, io::Error> {
+             use std:::{
+                fs::{self},
+                io::{self, Read}
+            };
+            let mut total_list = vec![];
+            let dir_list = fs::read_dir(path)?;
+            for entry in dir_list {
+                match entry {
+                    Ok(item) => match item.metadata()?.is_dir() {
+                        true => total_list.append(get_list_of_cows(&item.path()).unwrap().as_mut()),
+                        false => {
+                            if item.path().extension().unwrap() == "cow" {
+                                total_list.push(item.path().to_str().unwrap().to_string());
+                            }
+                        }
+                    },
+                    Err(e) => return Err(e),
                 }
-            },
-            Err(e) => return Err(e),
+            }
+
+            Ok(total_list)
+        }
+
+        let cow_list = get_list_of_cows(cow_path).expect("Could not open the cow path");
+
+        let chosen_idx = rng.next_lim_usize(cow_list.len());
+
+        let chosen_path = &cow_list[chosen_idx];
+        match fs::File::open(chosen_path) {
+            Ok(mut file) => {
+                let mut cow_str = String::new();
+                file.read_to_string(&mut cow_str)
+                    .expect("Error reading cow string");
+                cow_str
+            }
+            Err(e) => panic!("{e}"),
         }
     }
-
-    Ok(total_list)
-}
-
-pub fn choose_random_cow(cow_path: &PathBuf, rng: &mut impl Rand) -> String {
-    // let mut rng = thread_rng();
-    let cow_list = get_list_of_cows(cow_path).expect("Could not open the cow path");
-    let chosen_idx = rng.next_lim_usize(cow_list.len());
-
-    let chosen_path = &cow_list[chosen_idx];
-    match fs::File::open(chosen_path) {
-        Ok(mut file) => {
-            let mut cow_str = String::new();
-            file.read_to_string(&mut cow_str)
-                .expect("Error reading cow string");
-            cow_str
-        }
-        Err(e) => panic!("{e}"),
     }
 }
 
+#[cfg(not(feature = "inline-cowsay"))]
 pub fn identify_cow_path() -> PathBuf {
     //Check if we have an environment variable defined:
     let os = std::env::consts::OS;

@@ -21,6 +21,7 @@ pub enum TerminalCharacter {
     TerminalBackgroundColor256(u8),
     TerminalBackgroundColorTruecolor(u8, u8, u8),
     UnicodeCharacter(char),
+    EscapedUnicodeCharacter(char),
     ThoughtPlaceholder,
     EyePlaceholder,
     TonguePlaceholder,
@@ -172,6 +173,13 @@ fn unicode_char<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, Term
     ))(i)
 }
 
+//Fallback for a character that has an explicit escape
+fn escaped_char<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, TerminalCharacter, E> {
+    map(preceded(tag("\\"), take(1usize)), |character: &str| {
+        TerminalCharacter::EscapedUnicodeCharacter(character.chars().next().unwrap())
+    })(i)
+}
+
 fn comments<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, TerminalCharacter, E> {
     map(preceded(tag("#"), take_until("\n")), |_| {
         TerminalCharacter::Comment
@@ -253,6 +261,7 @@ pub fn cow_parser(input: &str) -> IResult<&str, TerminalCharacter> {
         colors_256,
         truecolor,
         unicode_char,
+        escaped_char,
         map(take(1 as usize), |c: &str| {
             //TODO I don't like this
             TerminalCharacter::UnicodeCharacter(c.chars().into_iter().next().unwrap())

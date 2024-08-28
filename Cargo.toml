@@ -22,11 +22,19 @@ strip-ansi-escapes = "0.2"
 unicode-width = "0.1"
 cfg-if = "1"
 
+[build-dependencies]
+proc-macro2 = "1"
+quote = "1"
+cfg-if = "1"
+
+
 [features]
-default = []
-inline = []
-inline-off = []
+default = ["inline-fortune", "inline-cowsay"]
+inline-fortune = []
+inline-off-fortune = []
 fortune-git = []
+inline-cowsay = []
+cowsay-git = []
 
 
 [profile.release]

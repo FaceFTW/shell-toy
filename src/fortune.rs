@@ -21,21 +21,21 @@ pub fn get_fortune(file_path: PathBuf, rng: &mut impl Rand) -> Result<String, Bo
         Err(e) => panic!("Could not open Fortune file! {e}"),
     }
 }
-#[cfg(feature = "inline")]
+#[cfg(feature = "inline-fortune")]
 const INLINE_FORTUNES: &'static str = include_str!("../target/resources/fortunes");
-#[cfg(all(feature = "inline", feature = "inline-off"))]
+#[cfg(all(feature = "inline-fortune", feature = "inline-off-fortune"))]
 const OFF_FORTUNES: &'static str = include_str!("../target/resources/off_fortunes");
 // #[cfg(all(feature = "inline", not(feature = "inline-off")))]
 // const OFF_FORTUNES: &'static str = "";
 
-#[cfg(feature = "inline")]
+#[cfg(feature = "inline-fortune")]
 pub fn get_inline_fortune(
     rng: &mut impl Rand,
     include_offensive: bool,
 ) -> Result<String, Box<dyn Error>> {
     //This is a fun little test
     cfg_if::cfg_if! {
-        if #[cfg(feature="inline-off")] {
+        if #[cfg(feature="inline-off-fortune")] {
             let off_iterator = match include_offensive {
                 true => OFF_FORTUNES.split("\n%\n").into_iter(),
                 false => "".split(""), //HACK iterator generics got yucky
