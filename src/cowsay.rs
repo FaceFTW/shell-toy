@@ -1,14 +1,7 @@
 use crate::parser::{cow_parser, TerminalCharacter};
 use cfg_if::cfg_if;
 use owo_colors::{DynColor, OwoColorize, Style, XtermColors};
-use std::{
-    collections::HashMap,
-    error::Error,
-    fs::{self},
-    io::{self, Read},
-    path::PathBuf,
-    str::from_utf8,
-};
+use std::{collections::HashMap, error::Error, path::PathBuf, str::from_utf8};
 use strip_ansi_escapes::strip;
 use textwrap::fill;
 use tinyrand::Rand;
@@ -282,6 +275,10 @@ pub fn choose_random_cow(cow_path: &Option<PathBuf>, rng: &mut impl Rand) -> Str
         COW_DATA[chosen_idx].1.to_string()
     } else {
         fn get_list_of_cows(path: &PathBuf) -> Result<Vec<String>, io::Error> {
+             use std:::{
+                fs::{self},
+                io::{self, Read}
+            };
             let mut total_list = vec![];
             let dir_list = fs::read_dir(path)?;
             for entry in dir_list {
