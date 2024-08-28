@@ -27,6 +27,8 @@ cfg-if = "1"
 proc-macro2 = "1"
 quote = "1"
 cfg-if = "1"
+toml = "0.8"
+serde = { version = "1", features = ["derive"] }
 
 
 [features]

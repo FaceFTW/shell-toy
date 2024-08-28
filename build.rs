@@ -1,5 +1,14 @@
+use std::io::Read;
+
+use serde::Deserialize;
+
 //This will likely always trigger because it just affects "pre-"compile time and not runtime
 fn main() -> Result<(), std::io::Error> {
+    let config: BuildConfig = get_config()?;
+    //Download Resources
+    get_external_resource(&config.cowsay.url, "cowsay")?;
+    get_external_resource(&config.fortune_mod.url, "fortune")?;
+
     #[cfg(feature = "inline-fortune")]
     create_fortune_db()?;
 
@@ -262,4 +271,85 @@ fn generate_cowsay_source() -> Result<(), std::io::Error> {
     }
 
     Ok(())
+}
+
+/************************************************/
+/**************Resource Functions****************/
+/************************************************/
+///Function to download a file via a synchronous call to a process
+/// specific to the OS.
+///
+/// This function will always expect a ZIP file to be downloaded, and it will be
+/// to `/target/downloads`
+fn get_external_resource(path: &str, resource_name: &str) -> Result<(), std::io::Error> {
+    let downloads_path = String::from("target/downloads");
+    println!("cargo::rerun-if-changed=target/downloads/cowsay.zip");
+    if let Err(_) = std::fs::read_dir(downloads_path.as_str()) {
+        std::fs::create_dir(downloads_path.as_str())?
+    }
+
+    let os = std::env::consts::FAMILY;
+    let mut proc = match os {
+        "windows" => {
+            let mut p = std::process::Command::new("powershell.exe");
+            p.args(&[
+                "-NoLogo",
+                "-NoProfile",
+                "-Command",
+                format!("Invoke-RestMethod {path} -OutFile {downloads_path}/{resource_name}.zip")
+                    .as_str(),
+            ]);
+            p
+        },
+        "unix" => {
+            let mut p = std::process::Command::new("curl");
+            p.args(&[
+                path,
+                "--output",
+                format!("{downloads_path}/{resource_name}.zip").as_str()
+            ]);
+            p
+        },
+        _ => panic!("Are you being special and building this on a non-standard operating system. \
+        Good for you. But I can't figure out what command to use for downloading files. \
+        Consider modifying the get_external_resource function in build.rs since you are similar enough to an Arch Linux user :p")
+    };
+    proc.spawn()?.wait()?;
+
+    Ok(())
+}
+
+/************************************************/
+/**************Configuration Functions***********/
+/************************************************/
+#[derive(Deserialize)]
+struct ResourceConfig {
+    #[serde(rename = "source-zip-url")]
+    pub url: String,
+    #[serde(rename = "resource-location")]
+    pub destination: String,
+}
+
+#[derive(Deserialize)]
+struct BuildConfig {
+    pub cowsay: ResourceConfig,
+    #[serde(rename = "fortune-mod")]
+    pub fortune_mod: ResourceConfig,
+}
+
+fn get_config() -> Result<BuildConfig, std::io::Error> {
+    println!("cargo::rerun-if-changed=./BuildConfig.toml");
+    match std::fs::File::open("./BuildConfig.toml") {
+        Ok(mut file) => {
+            let mut buf = String::new();
+            let _ = file.read_to_string(&mut buf);
+            Ok(
+                toml::from_str(buf.as_str())
+                    .expect("BuildConfig.toml was in an unexpected format!"),
+            )
+        }
+        Err(_) => {
+            panic!("Could not open the BuildConfig.toml in repository root. Did something happen?")
+        }
+    }
 }
