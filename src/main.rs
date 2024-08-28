@@ -44,7 +44,7 @@ fn main() {
                     choose_random_cow(&None, &mut rng)
                 } else {
                     let cow_path = identify_cow_path();
-                    choose_random_cow(Some(&cow_path), &mut rng)
+                    choose_random_cow(&Some(cow_path), &mut rng)
 
                 }
             }

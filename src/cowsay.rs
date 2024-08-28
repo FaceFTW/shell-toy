@@ -274,11 +274,11 @@ pub fn choose_random_cow(cow_path: &Option<PathBuf>, rng: &mut impl Rand) -> Str
         let chosen_idx = rng.next_lim_usize(COW_DATA.len());
         COW_DATA[chosen_idx].1.to_string()
     } else {
+        use std::{
+            fs::{self},
+            io::{self, Read}
+        };
         fn get_list_of_cows(path: &PathBuf) -> Result<Vec<String>, io::Error> {
-             use std:::{
-                fs::{self},
-                io::{self, Read}
-            };
             let mut total_list = vec![];
             let dir_list = fs::read_dir(path)?;
             for entry in dir_list {
@@ -298,7 +298,7 @@ pub fn choose_random_cow(cow_path: &Option<PathBuf>, rng: &mut impl Rand) -> Str
             Ok(total_list)
         }
 
-        let cow_list = get_list_of_cows(cow_path).expect("Could not open the cow path");
+        let cow_list = get_list_of_cows(&cow_path.as_ref().unwrap()).expect("Could not open the cow path");
 
         let chosen_idx = rng.next_lim_usize(cow_list.len());
 

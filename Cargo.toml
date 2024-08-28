@@ -7,6 +7,7 @@ license = "MIT"
 repository = "https://github.com/FaceFTW/shell-toy"
 keywords = ["terminal", "customization", "fortune", "cowsay", "fortune-cookie"]
 
+
 [[bin]]
 name = "sh-toy"
 path = "src/main.rs"
@@ -29,7 +30,7 @@ cfg-if = "1"
 
 
 [features]
-default = ["inline-fortune", "inline-cowsay"]
+default = []
 inline-fortune = []
 inline-off-fortune = []
 fortune-git = []
