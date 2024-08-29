@@ -29,6 +29,8 @@ quote = "1"
 cfg-if = "1"
 toml = "0.8"
 serde = { version = "1", features = ["derive"] }
+zip = "2.2"
+fs_extra = "1.3"
 
 
 [features]

@@ -1,13 +1,24 @@
-use std::io::Read;
+use core::panic;
+use std::{
+    fs::File,
+    io::{BufReader, Read},
+};
 
-use serde::Deserialize;
+use fs_extra::copy_items;
+use serde::{de, Deserialize};
 
 //This will likely always trigger because it just affects "pre-"compile time and not runtime
 fn main() -> Result<(), std::io::Error> {
     let config: BuildConfig = get_config()?;
     //Download Resources
-    get_external_resource(&config.cowsay.url, "cowsay")?;
-    get_external_resource(&config.fortune_mod.url, "fortune")?;
+    get_source_archive(&config.cowsay.url, "cowsay")?;
+    get_source_archive(&config.fortune_mod.url, "fortune")?;
+
+    extract_resources(
+        "target/downloads/cowsay.zip",
+        &config.cowsay.internal_path,
+        "target/resources/cowsay",
+    )?;
 
     #[cfg(feature = "inline-fortune")]
     create_fortune_db()?;
@@ -281,7 +292,7 @@ fn generate_cowsay_source() -> Result<(), std::io::Error> {
 ///
 /// This function will always expect a ZIP file to be downloaded, and it will be
 /// to `/target/downloads`
-fn get_external_resource(path: &str, resource_name: &str) -> Result<(), std::io::Error> {
+fn get_source_archive(path: &str, resource_name: &str) -> Result<(), std::io::Error> {
     let downloads_path = String::from("target/downloads");
     println!("cargo::rerun-if-changed=target/downloads/cowsay.zip");
     if let Err(_) = std::fs::read_dir(downloads_path.as_str()) {
@@ -319,6 +330,35 @@ fn get_external_resource(path: &str, resource_name: &str) -> Result<(), std::io:
     Ok(())
 }
 
+fn extract_resources(
+    archive: &str,
+    internal_path: &str,
+    destination: &str,
+) -> Result<(), std::io::Error> {
+    if let Err(_) = std::fs::read_dir("target/tmp") {
+        std::fs::create_dir("target/tmp")?
+    }
+    if let Err(_) = std::fs::read_dir("target/resources") {
+        std::fs::create_dir("target/resources")?
+    }
+    if let Err(_) = std::fs::read_dir(destination) {
+        std::fs::create_dir(destination)?
+    }
+
+    let archive_file = match File::open(archive) {
+        Ok(file) => BufReader::new(file),
+        Err(_) => panic!("Could not doo this"),
+    };
+    let mut zip_archive = zip::ZipArchive::new(archive_file)?;
+    zip_archive.extract("target/tmp")?;
+
+    let resource_path = format!("target/tmp/{internal_path}");
+    let copy_opts = fs_extra::dir::CopyOptions::new().overwrite(true);
+    let _ = copy_items(&[resource_path], destination, &copy_opts)
+        .expect("Could not copy resources as expected!");
+
+    Ok(())
+}
 /************************************************/
 /**************Configuration Functions***********/
 /************************************************/
@@ -327,7 +367,7 @@ struct ResourceConfig {
     #[serde(rename = "source-zip-url")]
     pub url: String,
     #[serde(rename = "resource-location")]
-    pub destination: String,
+    pub internal_path: String,
 }
 
 #[derive(Deserialize)]
