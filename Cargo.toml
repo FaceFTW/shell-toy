@@ -29,7 +29,12 @@ quote = "1"
 cfg-if = "1"
 toml = "0.8"
 serde = { version = "1", features = ["derive"] }
-zip = "2.2"
+zip = { version = "2.2", features = [
+	"deflate",
+	"deflate64",
+	"lzma",
+	"xz",
+], default-features = false }
 fs_extra = "1.3"
 
 

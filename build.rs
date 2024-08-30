@@ -1,30 +1,32 @@
-use core::panic;
-use std::{
-    fs::File,
-    io::{BufReader, Read},
-};
-
-use fs_extra::copy_items;
-use serde::{de, Deserialize};
-
 //This will likely always trigger because it just affects "pre-"compile time and not runtime
 fn main() -> Result<(), std::io::Error> {
+    #[cfg(any(feature = "inline-cowsay", feature = "inline-fortune"))]
     let config: BuildConfig = get_config()?;
     //Download Resources
-    get_source_archive(&config.cowsay.url, "cowsay")?;
-    get_source_archive(&config.fortune_mod.url, "fortune")?;
 
-    extract_resources(
-        "target/downloads/cowsay.zip",
-        &config.cowsay.internal_path,
-        "target/resources/cowsay",
-    )?;
+    cfg_if::cfg_if! {
+        if #[cfg(feature="inline-cowsay")] {
+            get_source_archive(&config.cowsay.url, "cowsay")?;
+            extract_resources(
+                "target/downloads/cowsay.zip",
+                &config.cowsay.internal_path,
+                "target/resources/cowsay",
+            )?;
+            generate_cowsay_source()?;
+        }
+    }
 
-    #[cfg(feature = "inline-fortune")]
-    create_fortune_db()?;
-
-    #[cfg(feature = "inline-cowsay")]
-    generate_cowsay_source()?;
+    cfg_if::cfg_if! {
+        if #[cfg(feature="inline-fortune")] {
+            get_source_archive(&config.fortune_mod.url, "fortune")?;
+            extract_resources(
+                "target/downloads/fortune.zip",
+                &config.fortune_mod.internal_path,
+                "target/resources/fortune",
+            )?;
+            create_fortune_db()?;
+        }
+    }
 
     Ok(())
 }
@@ -292,11 +294,14 @@ fn generate_cowsay_source() -> Result<(), std::io::Error> {
 ///
 /// This function will always expect a ZIP file to be downloaded, and it will be
 /// to `/target/downloads`
+#[cfg(any(feature = "inline-cowsay", feature = "inline-fortune"))]
 fn get_source_archive(path: &str, resource_name: &str) -> Result<(), std::io::Error> {
     let downloads_path = String::from("target/downloads");
-    println!("cargo::rerun-if-changed=target/downloads/cowsay.zip");
     if let Err(_) = std::fs::read_dir(downloads_path.as_str()) {
         std::fs::create_dir(downloads_path.as_str())?
+    }
+    if let Ok(_) = std::fs::metadata(format!("{downloads_path}/{resource_name}.zip").as_str()) {
+        std::fs::remove_file(format!("{downloads_path}/{resource_name}.zip").as_str())?;
     }
 
     let os = std::env::consts::FAMILY;
@@ -330,23 +335,33 @@ fn get_source_archive(path: &str, resource_name: &str) -> Result<(), std::io::Er
     Ok(())
 }
 
+#[cfg(any(feature = "inline-cowsay", feature = "inline-fortune"))]
 fn extract_resources(
     archive: &str,
     internal_path: &str,
     destination: &str,
 ) -> Result<(), std::io::Error> {
-    if let Err(_) = std::fs::read_dir("target/tmp") {
-        std::fs::create_dir("target/tmp")?
-    }
+    use std::io::Read;
+    match std::fs::read_dir("target/tmp") {
+        Ok(_) => {
+            std::fs::remove_dir_all("target/tmp")?;
+            std::fs::create_dir("target/tmp")?;
+        }
+        Err(_) => std::fs::create_dir("target/tmp")?,
+    };
     if let Err(_) = std::fs::read_dir("target/resources") {
         std::fs::create_dir("target/resources")?
     }
-    if let Err(_) = std::fs::read_dir(destination) {
-        std::fs::create_dir(destination)?
-    }
+    match std::fs::read_dir(destination) {
+        Ok(_) => {
+            std::fs::remove_dir_all(destination)?;
+            std::fs::create_dir(destination)?;
+        }
+        Err(_) => std::fs::create_dir(destination)?,
+    };
 
-    let archive_file = match File::open(archive) {
-        Ok(file) => BufReader::new(file),
+    let archive_file = match std::fs::File::open(archive) {
+        Ok(file) => std::io::BufReader::new(file),
         Err(_) => panic!("Could not doo this"),
     };
     let mut zip_archive = zip::ZipArchive::new(archive_file)?;
@@ -354,7 +369,13 @@ fn extract_resources(
 
     let resource_path = format!("target/tmp/{internal_path}");
     let copy_opts = fs_extra::dir::CopyOptions::new().overwrite(true);
-    let _ = copy_items(&[resource_path], destination, &copy_opts)
+    let resource_list: Vec<std::path::PathBuf> = std::fs::read_dir(resource_path)?
+        .map(|file| {
+            file.expect("Could not get metadata for some of the resources")
+                .path()
+        })
+        .collect();
+    let _ = fs_extra::copy_items(resource_list.as_slice(), destination, &copy_opts)
         .expect("Could not copy resources as expected!");
 
     Ok(())
@@ -362,7 +383,12 @@ fn extract_resources(
 /************************************************/
 /**************Configuration Functions***********/
 /************************************************/
-#[derive(Deserialize)]
+
+#[cfg(any(feature = "inline-cowsay", feature = "inline-fortune"))]
+#[cfg_attr(
+    any(feature = "inline-cowsay", feature = "inline-fortune"),
+    derive(serde::Deserialize)
+)]
 struct ResourceConfig {
     #[serde(rename = "source-zip-url")]
     pub url: String,
@@ -370,14 +396,20 @@ struct ResourceConfig {
     pub internal_path: String,
 }
 
-#[derive(Deserialize)]
+#[cfg(any(feature = "inline-cowsay", feature = "inline-fortune"))]
+#[cfg_attr(
+    any(feature = "inline-cowsay", feature = "inline-fortune"),
+    derive(serde::Deserialize)
+)]
 struct BuildConfig {
     pub cowsay: ResourceConfig,
     #[serde(rename = "fortune-mod")]
     pub fortune_mod: ResourceConfig,
 }
 
+#[cfg(any(feature = "inline-cowsay", feature = "inline-fortune"))]
 fn get_config() -> Result<BuildConfig, std::io::Error> {
+    use std::io::Read;
     println!("cargo::rerun-if-changed=./BuildConfig.toml");
     match std::fs::File::open("./BuildConfig.toml") {
         Ok(mut file) => {
