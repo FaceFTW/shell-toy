@@ -31,19 +31,17 @@ pub fn get_fortune(file_path: PathBuf, rng: &mut impl Rand) -> Result<String, Bo
 #[cfg(feature = "inline-fortune")]
 include!("../target/generated_sources/fortune_db.rs");
 
-macro_rules! choose_inline_fortune {
-    ($rng_ident:ident, $list_ident:ident) => {{
-        let chosen_idx = $rng_ident.next_lim_usize($list_ident.len());
-        Ok($list_ident[chosen_idx].to_string())
-    }};
-}
-
 #[cfg(feature = "inline-fortune")]
 pub fn get_inline_fortune(
     rng: &mut impl Rand,
     include_offensive: bool,
 ) -> Result<String, Box<dyn Error>> {
-    //This is a fun little test
+    macro_rules! choose_inline_fortune {
+        ($rng_ident:ident, $list_ident:ident) => {{
+            let chosen_idx = $rng_ident.next_lim_usize($list_ident.len());
+            Ok($list_ident[chosen_idx].to_string())
+        }};
+    }
 
     cfg_if::cfg_if! {
         if #[cfg(feature="inline-off-fortune")]{
@@ -57,6 +55,7 @@ pub fn get_inline_fortune(
                 choose_inline_fortune!(rng, FORTUNE_LIST)
             }
         } else {
+            let _ = include_offensive;
             choose_inline_fortune!(rng, FORTUNE_LIST)
         }
     }

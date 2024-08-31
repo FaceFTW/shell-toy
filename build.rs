@@ -6,6 +6,7 @@ use std::{
     path::PathBuf,
 };
 
+///Checks if an environment variable exists.
 macro_rules! check_env_flag {
     ($name:literal) => {
         match std::env::var($name) {
@@ -71,65 +72,19 @@ macro_rules! illegal_file_suffixes {
     };
 }
 
+///Checks if the directory exists. If it doesn't, it creates it
+macro_rules! check_dir_exists {
+    ($path:expr) => {
+        if let Err(_) = std::fs::read_dir($path) {
+            std::fs::create_dir($path)?
+        }
+    };
+}
+
 fn create_fortune_db() -> Result<(), std::io::Error> {
     /***************************************
      * Function Definitions (Because this is easier to fold)
      ***************************************/
-    fn gen_fortune_db(val: String) -> Result<(), io::Error> {
-        println!("cargo::rerun-if-changed={val}");
-
-        let mut concat_fortunes: String;
-        let off_concat_fortunes: String;
-        match fs::metadata(&val)?.is_file() {
-            true => {
-                //Assume file contains only non-offensive fortunes
-                match File::open(&val) {
-                    Ok(mut file) => {
-                        concat_fortunes = String::new();
-                        let _ = file.read_to_string(&mut concat_fortunes)?;
-                        off_concat_fortunes = String::new();
-                    }
-                    Err(_) => panic!("Could not read specified file defined by FORTUNE_FILE"),
-                }
-            }
-            false => {
-                let (fortune_list, offensive_list) =
-                    get_fortune_strings(&PathBuf::from(val), false);
-                concat_fortunes = fortune_list.replace("\r\n", "\n");
-                off_concat_fortunes = offensive_list.replace("\r\n", "\n");
-            }
-        }
-
-        let fortunes_split: Vec<&str> = concat_fortunes.split("\n%\n").collect();
-        let num_fortunes = fortunes_split.len();
-        let off_fortunes_split: Vec<&str> = off_concat_fortunes.split("\n%\n").collect();
-        let num_off_fortunes = off_fortunes_split.len();
-
-        let fortune_arr = quote::quote! {
-            const FORTUNE_LIST: [&'static str; #num_fortunes] = [
-                #(#fortunes_split) ,*
-            ];
-        };
-
-        let off_fortune_arr = quote::quote! {
-            const OFF_FORTUNE_LIST: [&'static str; #num_off_fortunes] = [
-                #(#off_fortunes_split) ,*
-            ];
-        };
-
-        match File::create("target/generated_sources/fortune_db.rs") {
-            Ok(mut file) => {
-                let _ = file.write_all(fortune_arr.to_string().as_bytes())?;
-                if check_env_flag!("CARGO_FEATURE_INLINE_OFF_FORTUNE") {
-                    let _ = file.write_all(off_fortune_arr.to_string().as_bytes())?;
-                }
-            }
-            Err(err) => panic!("Could not concatenate fortunes into single file: {err}"),
-        }
-
-        Ok(())
-    }
-
     fn get_fortune_strings(path: &PathBuf, is_offensive: bool) -> (String, String) {
         let illegal_file_suffixes: [&OsStr; 16] = illegal_file_suffixes!(
             "dat", "pos", "c", "h", "p", "i", "f", "pas", "ftn", "ins.c", "ins.pas", "ins.ftn",
@@ -185,24 +140,80 @@ fn create_fortune_db() -> Result<(), std::io::Error> {
         (fortune_buf, off_fortune_buf)
     }
 
+    fn gen_fortune_db(path: String) -> Result<(), io::Error> {
+        println!("cargo::rerun-if-changed={path}");
+
+        let mut concat_fortunes: String;
+        let off_concat_fortunes: String;
+        match fs::metadata(&path)?.is_file() {
+            true => {
+                //Assume file contains only non-offensive fortunes
+                match File::open(&path) {
+                    Ok(mut file) => {
+                        concat_fortunes = String::new();
+                        let _ = file.read_to_string(&mut concat_fortunes)?;
+                        off_concat_fortunes = String::new();
+                    }
+                    Err(_) => panic!("Could not read specified file defined by FORTUNE_FILE"),
+                }
+            }
+            false => {
+                let (fortune_list, offensive_list) =
+                    get_fortune_strings(&PathBuf::from(path), false);
+                concat_fortunes = fortune_list.replace("\r\n", "\n");
+                off_concat_fortunes = offensive_list.replace("\r\n", "\n");
+            }
+        }
+
+        let fortunes_split: Vec<&str> = concat_fortunes.split("\n%\n").collect();
+        let num_fortunes = fortunes_split.len();
+        let off_fortunes_split: Vec<&str> = off_concat_fortunes.split("\n%\n").collect();
+        let num_off_fortunes = off_fortunes_split.len();
+
+        let fortune_arr = quote::quote! {
+            const FORTUNE_LIST: [&'static str; #num_fortunes] = [
+                #(#fortunes_split) ,*
+            ];
+        };
+
+        let off_fortune_arr = quote::quote! {
+            const OFF_FORTUNE_LIST: [&'static str; #num_off_fortunes] = [
+                #(#off_fortunes_split) ,*
+            ];
+        };
+
+        match File::create("target/generated_sources/fortune_db.rs") {
+            Ok(mut file) => {
+                let _ = file.write_all(fortune_arr.to_string().as_bytes())?;
+                if check_env_flag!("CARGO_FEATURE_INLINE_OFF_FORTUNE") {
+                    let _ = file.write_all(off_fortune_arr.to_string().as_bytes())?;
+                }
+            }
+            Err(err) => panic!("Could not concatenate fortunes into single file: {err}"),
+        }
+
+        Ok(())
+    }
     /***************************************
      * The actual build steps
      ***************************************/
-    if let Err(_) = fs::read_dir("target/resources") {
-        fs::create_dir("target/resources")?
-    }
-    if let Err(_) = fs::read_dir("target/generated_sources") {
-        fs::create_dir("target/generated_sources")?
-    }
+    check_dir_exists!("target/resources");
+    check_dir_exists!("target/generated_sources");
 
-    if let Ok(val) = std::env::var("FORTUNE_FILE") {
-        println!("cargo::rerun-if-changed={val}");
-        gen_fortune_db(val)
-    } else if let Ok(val) = std::env::var("FORTUNE_PATH") {
-        println!("cargo::rerun-if-changed={val}");
-        gen_fortune_db(val)
+    if check_env_flag!("USE_DEFAULT_RESOURCES")
+        || (!check_env_flag!("FORTUNE_FILE") && !(check_env_flag!("FORTUNE_PATH")))
+    {
+        gen_fortune_db(String::from("target/resources/fortune"))
     } else {
-        panic!("I don't know what the default path for fortunes are for this OS!.\nPlease provide a FORTUNEPATH or FORTUNE_PATH environment variable, or a single file with FORTUNE_FILE")
+        if let Ok(val) = std::env::var("FORTUNE_FILE") {
+            println!("cargo::rerun-if-changed={val}");
+            gen_fortune_db(val)
+        } else if let Ok(val) = std::env::var("FORTUNE_PATH") {
+            println!("cargo::rerun-if-changed={val}");
+            gen_fortune_db(val)
+        } else {
+            panic!("Unexpected else branch hit toward end of create_fortune_db")
+        }
     }
 }
 
@@ -210,15 +221,6 @@ fn generate_cowsay_source() -> Result<(), std::io::Error> {
     /***************************************
      * Function Definitions (Because this is easier to fold)
      ***************************************/
-    fn identify_cow_path() -> PathBuf {
-        if let Ok(val) = std::env::var("COW_PATH") {
-            println!("cargo::rerun-if-changed={val}");
-            PathBuf::from(val.as_str())
-        } else {
-            PathBuf::from("target/resources/cowsay")
-        }
-    }
-
     fn get_cow_data(path: &PathBuf) -> Result<HashMap<String, String>, io::Error> {
         let mut total_list: HashMap<String, String> = HashMap::new();
         let dir_list = fs::read_dir(path)?;
@@ -278,11 +280,17 @@ fn generate_cowsay_source() -> Result<(), std::io::Error> {
     /***************************************
      * Actual Start of Build Steps
      ***************************************/
-    if let Err(_) = fs::read_dir("target/generated_sources") {
-        fs::create_dir("target/generated_sources")?
+    check_dir_exists!("target/generated_sources");
+
+    let cowpath: PathBuf;
+    if check_env_flag!("USE_DEFAULT_RESOURCES") || !check_env_flag!("COW_PATH") {
+        cowpath = PathBuf::from("target/resources/cowsay");
+    } else {
+        let path = std::env::var("COW_PATH").unwrap();
+        println!("cargo::rerun-if-changed={path}");
+        cowpath = PathBuf::from(path.as_str());
     }
 
-    let cowpath = identify_cow_path();
     let cow_data = get_cow_data(&cowpath)?;
     let tokenstream = make_source(cow_data)?;
 
@@ -310,9 +318,8 @@ fn get_source_archive(
     force_download: bool,
 ) -> Result<(), std::io::Error> {
     let downloads_path = String::from("target/downloads");
-    if let Err(_) = fs::read_dir(downloads_path.as_str()) {
-        fs::create_dir(downloads_path.as_str())?
-    }
+    check_dir_exists!(downloads_path.as_str());
+
     //Short circuit if we aren't force-redownloading and the resource exists
     match fs::metadata(format!("{downloads_path}/{resource_name}.zip").as_str()) {
         Ok(_) if force_download => {
