@@ -36,6 +36,8 @@ fn main() -> Result<(), std::io::Error> {
     println!("cargo::rerun-if-env-changed=FORTUNE_PATH");
 
     let config: BuildConfig = get_config()?;
+    println!("{:#?}", &config);
+
     //Download Resources
     if inline_cowsay_flag {
         if use_default_flag || !cow_path_exists {
@@ -44,6 +46,7 @@ fn main() -> Result<(), std::io::Error> {
                 "target/downloads/cowsay.zip",
                 &config.cowsay.internal_path,
                 "target/resources/cowsay",
+                &config.cowsay.exclude,
             )?;
         }
         generate_cowsay_source()?;
@@ -56,6 +59,7 @@ fn main() -> Result<(), std::io::Error> {
                 "target/downloads/fortune.zip",
                 &config.fortune_mod.internal_path,
                 "target/resources/fortune",
+                &config.fortune_mod.exclude,
             )?;
         }
         create_fortune_db()?;
@@ -366,6 +370,7 @@ fn extract_resources(
     archive: &str,
     internal_path: &str,
     destination: &str,
+    exclude: &Option<Vec<String>>,
 ) -> Result<(), std::io::Error> {
     match fs::read_dir("target/tmp") {
         Ok(_) => {
@@ -395,6 +400,21 @@ fn extract_resources(
     let resource_path = format!("target/tmp/{internal_path}");
     let copy_opts = fs_extra::dir::CopyOptions::new().overwrite(true);
     let resource_list: Vec<PathBuf> = fs::read_dir(resource_path)?
+        .filter(|file| {
+            if let Some(exclude_list) = exclude {
+                !exclude_list.contains(
+                    &file
+                        .as_ref()
+                        .expect("Could not get metadata for some of the resources")
+                        .file_name()
+                        .clone()
+                        .into_string()
+                        .unwrap(),
+                )
+            } else {
+                true
+            }
+        })
         .map(|file| {
             file.expect("Could not get metadata for some of the resources")
                 .path()
@@ -409,15 +429,16 @@ fn extract_resources(
 /**************Configuration Functions***********/
 /************************************************/
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Debug)]
 struct ResourceConfig {
     #[serde(rename = "source-zip-url")]
     pub url: String,
     #[serde(rename = "resource-location")]
     pub internal_path: String,
+    pub exclude: Option<Vec<String>>,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Debug)]
 struct BuildConfig {
     pub cowsay: ResourceConfig,
     #[serde(rename = "fortune-mod")]
@@ -427,6 +448,7 @@ struct BuildConfig {
 fn get_config() -> Result<BuildConfig, std::io::Error> {
     use std::io::Read;
     println!("cargo::rerun-if-changed=./BuildConfig.toml");
+
     match File::open("./BuildConfig.toml") {
         Ok(mut file) => {
             let mut buf = String::new();
