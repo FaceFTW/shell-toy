@@ -1,31 +1,63 @@
+use std::{
+    collections::HashMap,
+    ffi::OsStr,
+    fs::{self, remove_file, File},
+    io::{self, BufReader, Read, Write},
+    path::PathBuf,
+};
+
+macro_rules! check_env_flag {
+    ($name:literal) => {
+        match std::env::var($name) {
+            Ok(_) => true,
+            Err(_) => false,
+        }
+    };
+}
+
 //This will likely always trigger because it just affects "pre-"compile time and not runtime
 fn main() -> Result<(), std::io::Error> {
-    #[cfg(any(feature = "inline-cowsay", feature = "inline-fortune"))]
+    //Here we get a bunch of the env flags we need for evaluating what features are enabled
+    let inline_fortune_flag = check_env_flag!("CARGO_FEATURE_INLINE_FORTUNE");
+    println!("cargo::rerun-if-env-changed=CARGO_FEATURE_INLINE_FORTUNE");
+    println!("cargo::rerun-if-env-changed=CARGO_FEATURE_INLINE_OFF_FORTUNE");
+    let inline_cowsay_flag = check_env_flag!("CARGO_FEATURE_INLINE_COWSAY");
+    println!("cargo::rerun-if-env-changed=CARGO_FEATURE_INLINE_COWSAY");
+    let force_download_flag = check_env_flag!("FORCE_DOWNLOAD");
+    println!("cargo::rerun-if-env-changed=FORCE_DOWNLOAD");
+    let use_default_flag = check_env_flag!("USE_DEFAULT_RESOURCES");
+    println!("cargo::rerun-if-env-changed=USE_DEFAULT_RESOURCES");
+    let cow_path_exists = check_env_flag!("COW_PATH");
+    println!("cargo::rerun-if-env-changed=COW_PATH");
+    let fortune_file_exists = check_env_flag!("FORTUNE_FILE");
+    println!("cargo::rerun-if-env-changed=FORTUNE_FILE");
+    let fortune_path_exists = check_env_flag!("FORTUNE_PATH");
+    println!("cargo::rerun-if-env-changed=FORTUNE_PATH");
+
     let config: BuildConfig = get_config()?;
     //Download Resources
-
-    cfg_if::cfg_if! {
-        if #[cfg(feature="inline-cowsay")] {
-            get_source_archive(&config.cowsay.url, "cowsay")?;
+    if inline_cowsay_flag {
+        if use_default_flag || !cow_path_exists {
+            get_source_archive(&config.cowsay.url, "cowsay", force_download_flag)?;
             extract_resources(
                 "target/downloads/cowsay.zip",
                 &config.cowsay.internal_path,
                 "target/resources/cowsay",
             )?;
-            generate_cowsay_source()?;
         }
+        generate_cowsay_source()?;
     }
 
-    cfg_if::cfg_if! {
-        if #[cfg(feature="inline-fortune")] {
-            get_source_archive(&config.fortune_mod.url, "fortune")?;
+    if inline_fortune_flag {
+        if use_default_flag || (!fortune_file_exists && !fortune_path_exists) {
+            get_source_archive(&config.fortune_mod.url, "fortune", force_download_flag)?;
             extract_resources(
                 "target/downloads/fortune.zip",
                 &config.fortune_mod.internal_path,
                 "target/resources/fortune",
             )?;
-            create_fortune_db()?;
         }
+        create_fortune_db()?;
     }
 
     Ok(())
@@ -39,15 +71,7 @@ macro_rules! illegal_file_suffixes {
     };
 }
 
-#[cfg(feature = "inline-fortune")]
 fn create_fortune_db() -> Result<(), std::io::Error> {
-    use std::{
-        ffi::OsStr,
-        fs::{self, File},
-        io::{self, Read, Write},
-        path::PathBuf,
-    };
-
     /***************************************
      * Function Definitions (Because this is easier to fold)
      ***************************************/
@@ -56,10 +80,10 @@ fn create_fortune_db() -> Result<(), std::io::Error> {
 
         let mut concat_fortunes: String;
         let off_concat_fortunes: String;
-        match std::fs::metadata(&val)?.is_file() {
+        match fs::metadata(&val)?.is_file() {
             true => {
                 //Assume file contains only non-offensive fortunes
-                match std::fs::File::open(&val) {
+                match File::open(&val) {
                     Ok(mut file) => {
                         concat_fortunes = String::new();
                         let _ = file.read_to_string(&mut concat_fortunes)?;
@@ -70,11 +94,9 @@ fn create_fortune_db() -> Result<(), std::io::Error> {
             }
             false => {
                 let (fortune_list, offensive_list) =
-                    fortune_list_iterate(&PathBuf::from(val), false);
-                concat_fortunes =
-                    concat_fortune_files(fortune_list.as_slice())?.replace("\r\n", "\n");
-                off_concat_fortunes =
-                    concat_fortune_files(offensive_list.as_slice())?.replace("\r\n", "\n");
+                    get_fortune_strings(&PathBuf::from(val), false);
+                concat_fortunes = fortune_list.replace("\r\n", "\n");
+                off_concat_fortunes = offensive_list.replace("\r\n", "\n");
             }
         }
 
@@ -95,12 +117,12 @@ fn create_fortune_db() -> Result<(), std::io::Error> {
             ];
         };
 
-
-
         match File::create("target/generated_sources/fortune_db.rs") {
             Ok(mut file) => {
                 let _ = file.write_all(fortune_arr.to_string().as_bytes())?;
-                let _ = file.write_all(off_fortune_arr.to_string().as_bytes())?;
+                if check_env_flag!("CARGO_FEATURE_INLINE_OFF_FORTUNE") {
+                    let _ = file.write_all(off_fortune_arr.to_string().as_bytes())?;
+                }
             }
             Err(err) => panic!("Could not concatenate fortunes into single file: {err}"),
         }
@@ -108,60 +130,59 @@ fn create_fortune_db() -> Result<(), std::io::Error> {
         Ok(())
     }
 
-    fn fortune_list_iterate(path: &PathBuf, is_offensive: bool) -> (Vec<PathBuf>, Vec<PathBuf>) {
+    fn get_fortune_strings(path: &PathBuf, is_offensive: bool) -> (String, String) {
         let illegal_file_suffixes: [&OsStr; 16] = illegal_file_suffixes!(
             "dat", "pos", "c", "h", "p", "i", "f", "pas", "ftn", "ins.c", "ins.pas", "ins.ftn",
             "sml", "sh", "pl", "csv"
         );
+        let mut fortune_buf = String::new();
+        let mut off_fortune_buf = String::new();
 
-        let mut fortune_list = vec![];
-        let mut offensive_list = vec![];
         let dir_list = fs::read_dir(path).expect("Could not open directory");
         for entry in dir_list.filter(|item| {
             !illegal_file_suffixes.contains(
-            &item
-                .as_ref()
-                .unwrap()
-                .path()
-                .extension()
-                .unwrap_or_default(),
-        ) &&
-		//Additional condition to ignore the CMakeLists.txt file specifically in fortune-mod
-		!item.as_ref().unwrap().path().ends_with("CMakeLists.txt")
+                &item
+                    .as_ref()
+                    .unwrap()
+                    .path()
+                    .extension()
+                    .unwrap_or_default(),
+            ) &&
+        	//Additional condition to ignore the CMakeLists.txt file specifically in fortune-mod
+        	!item.as_ref().unwrap().path().ends_with("CMakeLists.txt")
         }) {
             match entry {
                 Ok(item) => match item.metadata().unwrap().is_dir() {
                     true => {
                         if item.file_name() == "off" {
-                            offensive_list.append(&mut fortune_list_iterate(&item.path(), true).1)
+                            off_fortune_buf = off_fortune_buf
+                                + get_fortune_strings(&item.path(), true).1.as_str();
                         } else {
-                            let vecs = &mut fortune_list_iterate(&item.path(), is_offensive);
-                            fortune_list.append(&mut vecs.0);
-                            offensive_list.append(&mut vecs.1);
+                            let (fortunes, off_fortunes) =
+                                get_fortune_strings(&item.path(), is_offensive);
+                            fortune_buf = fortune_buf + fortunes.as_str();
+                            off_fortune_buf = off_fortune_buf + off_fortunes.as_str();
                         }
                     }
-                    false => match is_offensive {
-                        true => offensive_list.push(item.path()),
-                        false => fortune_list.push(item.path()),
+                    false => match File::open(item.path()) {
+                        Ok(mut file) => {
+                            let mut buf = String::new();
+                            let _ = file.read_to_string(&mut buf);
+
+                            match is_offensive {
+                                true => off_fortune_buf = off_fortune_buf + buf.as_str(),
+                                false => fortune_buf = fortune_buf + buf.as_str(),
+                            };
+                        }
+                        Err(_) => panic!(
+                            "Could not open a fortune file for copying into internal buffers"
+                        ),
                     },
                 },
                 Err(e) => panic!("Could not identify a file in the fortune directory {e}"),
             }
         }
-        (fortune_list, offensive_list)
-    }
-
-    fn concat_fortune_files(list: &[PathBuf]) -> Result<String, io::Error> {
-        let mut buffer = String::new();
-        for path in list {
-            match File::open(path) {
-                Ok(mut file) => {
-                    let _ = file.read_to_string(&mut buffer)?;
-                }
-                Err(err) => panic!("Could not open file: {err}"),
-            }
-        }
-        Ok(buffer)
+        (fortune_buf, off_fortune_buf)
     }
 
     /***************************************
@@ -185,14 +206,7 @@ fn create_fortune_db() -> Result<(), std::io::Error> {
     }
 }
 
-#[cfg(feature = "inline-cowsay")]
 fn generate_cowsay_source() -> Result<(), std::io::Error> {
-    use std::{
-        collections::HashMap,
-        fs::{self, File},
-        io::{self, Read, Write},
-        path::PathBuf,
-    };
     /***************************************
      * Function Definitions (Because this is easier to fold)
      ***************************************/
@@ -201,6 +215,7 @@ fn generate_cowsay_source() -> Result<(), std::io::Error> {
             println!("cargo::rerun-if-changed={val}");
             PathBuf::from(val.as_str())
         } else {
+            PathBuf::from("target/resources/cowsay")
         }
     }
 
@@ -288,16 +303,26 @@ fn generate_cowsay_source() -> Result<(), std::io::Error> {
 /// specific to the OS.
 ///
 /// This function will always expect a ZIP file to be downloaded, and it will be
-/// to `/target/downloads`
-#[cfg(any(feature = "inline-cowsay", feature = "inline-fortune"))]
-fn get_source_archive(path: &str, resource_name: &str) -> Result<(), std::io::Error> {
+/// to `/target/downloads`.
+fn get_source_archive(
+    path: &str,
+    resource_name: &str,
+    force_download: bool,
+) -> Result<(), std::io::Error> {
     let downloads_path = String::from("target/downloads");
-    if let Err(_) = std::fs::read_dir(downloads_path.as_str()) {
-        std::fs::create_dir(downloads_path.as_str())?
+    if let Err(_) = fs::read_dir(downloads_path.as_str()) {
+        fs::create_dir(downloads_path.as_str())?
     }
-    if let Ok(_) = std::fs::metadata(format!("{downloads_path}/{resource_name}.zip").as_str()) {
-        std::fs::remove_file(format!("{downloads_path}/{resource_name}.zip").as_str())?;
-    }
+    //Short circuit if we aren't force-redownloading and the resource exists
+    match fs::metadata(format!("{downloads_path}/{resource_name}.zip").as_str()) {
+        Ok(_) if force_download => {
+            remove_file(format!("{downloads_path}/{resource_name}.zip").as_str())?;
+        }
+        Ok(_) => {
+            return Ok(()); //Short Circuit
+        }
+        Err(_) => (),
+    };
 
     let os = std::env::consts::FAMILY;
     let mut proc = match os {
@@ -330,33 +355,31 @@ fn get_source_archive(path: &str, resource_name: &str) -> Result<(), std::io::Er
     Ok(())
 }
 
-#[cfg(any(feature = "inline-cowsay", feature = "inline-fortune"))]
 fn extract_resources(
     archive: &str,
     internal_path: &str,
     destination: &str,
 ) -> Result<(), std::io::Error> {
-    use std::io::Read;
-    match std::fs::read_dir("target/tmp") {
+    match fs::read_dir("target/tmp") {
         Ok(_) => {
-            std::fs::remove_dir_all("target/tmp")?;
-            std::fs::create_dir("target/tmp")?;
+            fs::remove_dir_all("target/tmp")?;
+            fs::create_dir("target/tmp")?;
         }
-        Err(_) => std::fs::create_dir("target/tmp")?,
+        Err(_) => fs::create_dir("target/tmp")?,
     };
-    if let Err(_) = std::fs::read_dir("target/resources") {
-        std::fs::create_dir("target/resources")?
+    if let Err(_) = fs::read_dir("target/resources") {
+        fs::create_dir("target/resources")?
     }
-    match std::fs::read_dir(destination) {
+    match fs::read_dir(destination) {
         Ok(_) => {
-            std::fs::remove_dir_all(destination)?;
-            std::fs::create_dir(destination)?;
+            fs::remove_dir_all(destination)?;
+            fs::create_dir(destination)?;
         }
-        Err(_) => std::fs::create_dir(destination)?,
+        Err(_) => fs::create_dir(destination)?,
     };
 
-    let archive_file = match std::fs::File::open(archive) {
-        Ok(file) => std::io::BufReader::new(file),
+    let archive_file = match File::open(archive) {
+        Ok(file) => BufReader::new(file),
         Err(_) => panic!("Could not doo this"),
     };
     let mut zip_archive = zip::ZipArchive::new(archive_file)?;
@@ -364,7 +387,7 @@ fn extract_resources(
 
     let resource_path = format!("target/tmp/{internal_path}");
     let copy_opts = fs_extra::dir::CopyOptions::new().overwrite(true);
-    let resource_list: Vec<std::path::PathBuf> = std::fs::read_dir(resource_path)?
+    let resource_list: Vec<PathBuf> = fs::read_dir(resource_path)?
         .map(|file| {
             file.expect("Could not get metadata for some of the resources")
                 .path()
@@ -379,11 +402,7 @@ fn extract_resources(
 /**************Configuration Functions***********/
 /************************************************/
 
-#[cfg(any(feature = "inline-cowsay", feature = "inline-fortune"))]
-#[cfg_attr(
-    any(feature = "inline-cowsay", feature = "inline-fortune"),
-    derive(serde::Deserialize)
-)]
+#[derive(serde::Deserialize)]
 struct ResourceConfig {
     #[serde(rename = "source-zip-url")]
     pub url: String,
@@ -391,22 +410,17 @@ struct ResourceConfig {
     pub internal_path: String,
 }
 
-#[cfg(any(feature = "inline-cowsay", feature = "inline-fortune"))]
-#[cfg_attr(
-    any(feature = "inline-cowsay", feature = "inline-fortune"),
-    derive(serde::Deserialize)
-)]
+#[derive(serde::Deserialize)]
 struct BuildConfig {
     pub cowsay: ResourceConfig,
     #[serde(rename = "fortune-mod")]
     pub fortune_mod: ResourceConfig,
 }
 
-#[cfg(any(feature = "inline-cowsay", feature = "inline-fortune"))]
 fn get_config() -> Result<BuildConfig, std::io::Error> {
     use std::io::Read;
     println!("cargo::rerun-if-changed=./BuildConfig.toml");
-    match std::fs::File::open("./BuildConfig.toml") {
+    match File::open("./BuildConfig.toml") {
         Ok(mut file) => {
             let mut buf = String::new();
             let _ = file.read_to_string(&mut buf);
