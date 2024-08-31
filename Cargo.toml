@@ -39,12 +39,10 @@ fs_extra = "1.3"
 
 
 [features]
-default = []
+default = ["inline-fortune", "inline-off-fortune"]
 inline-fortune = []
 inline-off-fortune = []
-fortune-git = []
 inline-cowsay = []
-cowsay-git = []
 
 
 [profile.release]

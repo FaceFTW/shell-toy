@@ -21,12 +21,22 @@ pub fn get_fortune(file_path: PathBuf, rng: &mut impl Rand) -> Result<String, Bo
         Err(e) => panic!("Could not open Fortune file! {e}"),
     }
 }
-#[cfg(feature = "inline-fortune")]
-const INLINE_FORTUNES: &'static str = include_str!("../target/resources/fortunes");
-#[cfg(all(feature = "inline-fortune", feature = "inline-off-fortune"))]
-const OFF_FORTUNES: &'static str = include_str!("../target/resources/off_fortunes");
+// #[cfg(feature = "inline-fortune")]
+// const INLINE_FORTUNES: &'static str = include_str!("../target/resources/fortunes");
+// #[cfg(all(feature = "inline-fortune", feature = "inline-off-fortune"))]
+// const OFF_FORTUNES: &'static str = include_str!("../target/resources/off_fortunes");
 // #[cfg(all(feature = "inline", not(feature = "inline-off")))]
 // const OFF_FORTUNES: &'static str = "";
+
+#[cfg(feature = "inline-fortune")]
+include!("../target/generated_sources/fortune_db.rs");
+
+macro_rules! choose_inline_fortune {
+    ($rng_ident:ident, $list_ident:ident) => {{
+        let chosen_idx = $rng_ident.next_lim_usize($list_ident.len());
+        Ok($list_ident[chosen_idx].to_string())
+    }};
+}
 
 #[cfg(feature = "inline-fortune")]
 pub fn get_inline_fortune(
@@ -34,25 +44,22 @@ pub fn get_inline_fortune(
     include_offensive: bool,
 ) -> Result<String, Box<dyn Error>> {
     //This is a fun little test
+
     cfg_if::cfg_if! {
-        if #[cfg(feature="inline-off-fortune")] {
-            let off_iterator = match include_offensive {
-                true => OFF_FORTUNES.split("\n%\n").into_iter(),
-                false => "".split(""), //HACK iterator generics got yucky
-            };
+        if #[cfg(feature="inline-off-fortune")]{
+            if include_offensive {
+                let weight_off:f64 = OFF_FORTUNE_LIST.len() as f64/(FORTUNE_LIST.len() as f64 + OFF_FORTUNE_LIST.len() as f64);
+                match rng.next_bool(weight_off.into()){
+                    true => choose_inline_fortune!(rng, OFF_FORTUNE_LIST),
+                    false => choose_inline_fortune!(rng, FORTUNE_LIST),
+                }
+            } else {
+                choose_inline_fortune!(rng, FORTUNE_LIST)
+            }
         } else {
-            let _off = include_offensive;   //discard binding
-            let off_iterator = "".split("");
+            choose_inline_fortune!(rng, FORTUNE_LIST)
         }
     }
-
-    let fortune_split: Vec<&str> = INLINE_FORTUNES
-        .split("\n%\n")
-        .into_iter()
-        .chain(off_iterator)
-        .collect();
-    let chosen_idx = rng.next_lim_usize(fortune_split.len());
-    Ok(fortune_split[chosen_idx].to_string())
 }
 
 pub fn choose_fortune_file(
@@ -70,9 +77,6 @@ pub fn choose_fortune_file(
     } else if let Ok(val) = std::env::var("FORTUNE_FILE") {
         PathBuf::from(val.as_str())
     } else if let Ok(val) = std::env::var("FORTUNE_PATH") {
-        choose_random_fortune_file(&PathBuf::from(val.as_str()), include_offensive, rng)
-            .expect("Could not choose a random fortune file from the specified Fortune Path")
-    } else if let Ok(val) = std::env::var("FORTUNEPATH") {
         choose_random_fortune_file(&PathBuf::from(val.as_str()), include_offensive, rng)
             .expect("Could not choose a random fortune file from the specified Fortune Path")
     } else {

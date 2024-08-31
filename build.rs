@@ -31,6 +31,14 @@ fn main() -> Result<(), std::io::Error> {
     Ok(())
 }
 
+macro_rules! illegal_file_suffixes {
+    ($($ext:literal),*) => {
+        [
+            $(std::ffi::OsStr::new($ext)),*
+        ]
+    };
+}
+
 #[cfg(feature = "inline-fortune")]
 fn create_fortune_db() -> Result<(), std::io::Error> {
     use std::{
@@ -43,47 +51,68 @@ fn create_fortune_db() -> Result<(), std::io::Error> {
     /***************************************
      * Function Definitions (Because this is easier to fold)
      ***************************************/
-    fn gen_concat_fortune_files(val: String) -> Result<(), io::Error> {
+    fn gen_fortune_db(val: String) -> Result<(), io::Error> {
         println!("cargo::rerun-if-changed={val}");
-        let (fortune_list, offensive_list) = fortune_list_iterate(&PathBuf::from(val), false);
-        let concat_fortunes = concat_fortune_files(fortune_list.as_slice())?.replace("\r\n", "\n");
-        let off_concat_fortunes =
-            concat_fortune_files(offensive_list.as_slice())?.replace("\r\n", "\n");
-        println!("{:#?}", offensive_list.as_slice());
-        match File::create("target/resources/fortunes") {
+
+        let mut concat_fortunes: String;
+        let off_concat_fortunes: String;
+        match std::fs::metadata(&val)?.is_file() {
+            true => {
+                //Assume file contains only non-offensive fortunes
+                match std::fs::File::open(&val) {
+                    Ok(mut file) => {
+                        concat_fortunes = String::new();
+                        let _ = file.read_to_string(&mut concat_fortunes)?;
+                        off_concat_fortunes = String::new();
+                    }
+                    Err(_) => panic!("Could not read specified file defined by FORTUNE_FILE"),
+                }
+            }
+            false => {
+                let (fortune_list, offensive_list) =
+                    fortune_list_iterate(&PathBuf::from(val), false);
+                concat_fortunes =
+                    concat_fortune_files(fortune_list.as_slice())?.replace("\r\n", "\n");
+                off_concat_fortunes =
+                    concat_fortune_files(offensive_list.as_slice())?.replace("\r\n", "\n");
+            }
+        }
+
+        let fortunes_split: Vec<&str> = concat_fortunes.split("\n%\n").collect();
+        let num_fortunes = fortunes_split.len();
+        let off_fortunes_split: Vec<&str> = off_concat_fortunes.split("\n%\n").collect();
+        let num_off_fortunes = off_fortunes_split.len();
+
+        let fortune_arr = quote::quote! {
+            const FORTUNE_LIST: [&'static str; #num_fortunes] = [
+                #(#fortunes_split) ,*
+            ];
+        };
+
+        let off_fortune_arr = quote::quote! {
+            const OFF_FORTUNE_LIST: [&'static str; #num_off_fortunes] = [
+                #(#off_fortunes_split) ,*
+            ];
+        };
+
+
+
+        match File::create("target/generated_sources/fortune_db.rs") {
             Ok(mut file) => {
-                let _ = file.write_all(concat_fortunes.trim().as_bytes())?;
+                let _ = file.write_all(fortune_arr.to_string().as_bytes())?;
+                let _ = file.write_all(off_fortune_arr.to_string().as_bytes())?;
             }
             Err(err) => panic!("Could not concatenate fortunes into single file: {err}"),
         }
-        match File::create("target/resources/off_fortunes") {
-            Ok(mut file) => {
-                let _ = file.write_all(off_concat_fortunes.trim().as_bytes())?;
-            }
-            Err(err) => panic!("Could not concatenate fortunes into single file: {err}"),
-        }
+
         Ok(())
     }
 
     fn fortune_list_iterate(path: &PathBuf, is_offensive: bool) -> (Vec<PathBuf>, Vec<PathBuf>) {
-        let illegal_file_suffixes: [&OsStr; 16] = [
-            OsStr::new("dat"),
-            OsStr::new("pos"),
-            OsStr::new("c"),
-            OsStr::new("h"),
-            OsStr::new("p"),
-            OsStr::new("i"),
-            OsStr::new("f"),
-            OsStr::new("pas"),
-            OsStr::new("ftn"),
-            OsStr::new("ins.c"),
-            OsStr::new("ins.pas"),
-            OsStr::new("ins.ftn"),
-            OsStr::new("sml"),
-            OsStr::new("sh"),
-            OsStr::new("pl"),
-            OsStr::new("csv"),
-        ];
+        let illegal_file_suffixes: [&OsStr; 16] = illegal_file_suffixes!(
+            "dat", "pos", "c", "h", "p", "i", "f", "pas", "ftn", "ins.c", "ins.pas", "ins.ftn",
+            "sml", "sh", "pl", "csv"
+        );
 
         let mut fortune_list = vec![];
         let mut offensive_list = vec![];
@@ -141,33 +170,18 @@ fn create_fortune_db() -> Result<(), std::io::Error> {
     if let Err(_) = fs::read_dir("target/resources") {
         fs::create_dir("target/resources")?
     }
+    if let Err(_) = fs::read_dir("target/generated_sources") {
+        fs::create_dir("target/generated_sources")?
+    }
 
-    cfg_if::cfg_if! {
-        if #[cfg(feature="fortune-git")]{
-            println!("cargo::rerun-if-changed={val}");
-            gen_concat_fortune_files("./fortunes/fortune-mod/datfiles".to_string())
-        } else {
-            if let Ok(val) = std::env::var("FORTUNE_FILE") {
-                println!("cargo::rerun-if-changed={val}");
-                let _ = fs::copy(val, "target/resources/fortunes")?;
-                Ok(())
-            } else if let Ok(val) = std::env::var("FORTUNE_PATH") {
-                println!("cargo::rerun-if-changed={val}");
-                gen_concat_fortune_files(val)
-            } else if let Ok(val) = std::env::var("FORTUNEPATH") {
-                println!("cargo::rerun-if-changed={val}");
-                gen_concat_fortune_files(val)
-            } else {
-                match std::env::consts::OS{
-                    //It's a longshot but you never know
-                    "linux" => {
-                        println!("cargo::rerun-if-changed=/usr/share/games/fortunes");
-                        gen_concat_fortune_files(String::from("/usr/share/games/fortunes"))
-                    },
-                    _ => panic!("I don't know what the default path for fortunes are for this OS!.\nPlease provide a FORTUNEPATH or FORTUNE_PATH environment variable, or a single file with FORTUNE_FILE")
-                }
-            }
-        }
+    if let Ok(val) = std::env::var("FORTUNE_FILE") {
+        println!("cargo::rerun-if-changed={val}");
+        gen_fortune_db(val)
+    } else if let Ok(val) = std::env::var("FORTUNE_PATH") {
+        println!("cargo::rerun-if-changed={val}");
+        gen_fortune_db(val)
+    } else {
+        panic!("I don't know what the default path for fortunes are for this OS!.\nPlease provide a FORTUNEPATH or FORTUNE_PATH environment variable, or a single file with FORTUNE_FILE")
     }
 }
 
@@ -183,29 +197,10 @@ fn generate_cowsay_source() -> Result<(), std::io::Error> {
      * Function Definitions (Because this is easier to fold)
      ***************************************/
     fn identify_cow_path() -> PathBuf {
-        cfg_if::cfg_if! {
-            if #[cfg(feature="cowsay-git")]{
-                println!("cargo::rerun-if-changed=./cowsay/share/cowsay/cows");
-                PathBuf::from("./cowsay/share/cowsay/cows")
-            } else {
-                //Check if we have an environment variable defined:
-                let os = std::env::consts::OS;
-                if let Ok(val) = std::env::var("COWPATH") {
-                    println!("cargo::rerun-if-changed={val}");
-                    PathBuf::from(val.as_str())
-                } else if let Ok(val) = std::env::var("COW_PATH") {
-                    println!("cargo::rerun-if-changed={val}");
-                    PathBuf::from(val.as_str())
-                } else {
-                    match os{
-                        "linux" => {
-                            println!("cargo::rerun-if-changed=/usr/share/cowsay/cows");
-                            PathBuf::from("/usr/share/cowsay/cows")
-                        },
-                        _ => panic!("I don't know what the default path for cowfiles is for this OS!.\nPlease provide a COWPATH or COW_PATH environment variable")
-                    }
-                }
-            }
+        if let Ok(val) = std::env::var("COW_PATH") {
+            println!("cargo::rerun-if-changed={val}");
+            PathBuf::from(val.as_str())
+        } else {
         }
     }
 
