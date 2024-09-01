@@ -1,0 +1,30 @@
+name: Build-Check
+
+on:
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - name: "No Inlining"
+            feature_flags: ""
+          - name: "Fortune Inlining"
+            feature_flags: "--features inline-fortune"
+          - name: "Cowfile Inlining"
+            feature_flags: "--features inline-cowsay"
+          - name: "Full Inlining"
+            feature_flags: "--features inline-fortune,inline-cowsay"
+          - name: "Full Inlining with Offensive Fortunes"
+            feature_flags: "--features inline-fortune,inline-off-fortunes,inline-cowsay"
+    steps:
+      - name: "Install Fixed Rust Toolchain"
+        run: rustup default 1.80.1
+      - name: Cargo Build
+        run: cargo build ${{ matrix.feature_flags }} --release -vv
+
+
