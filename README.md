@@ -88,7 +88,11 @@ If you are on a Linux Platform which has the `cowsay` and `fortune` packages ava
 ## Legal Stuff
 `shell-toy` is licensed under the MIT License.
 
-While `fortune-mod` is a Git submodule of this repository, no source code or binary linkage occurs with the `fortune-mod` executables; only the fortune files are used in certain compilation scenarios. I claim no ownership or intellectual property of content in that repository.
+By default, the build script for `shell-toy` uses resources from the following open-source projects. There is no code linkage with these projects, only the resource files are used with certain conditional compilation flags.
+
+- [fortune-mod](https://github.com/shlomif/fortune-mod)
+- [cowsay](https://github.com/cowsay-org/cowsay)
+
 
 This project uses modified portions of code from the following projects (this is documented in the source code where it occurs)
 - [charasay](https://github.com/latipun7/charasay/blob/main/src/bubbles.rs) - MIT License
