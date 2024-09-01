@@ -22,6 +22,7 @@ jobs:
           - name: "Full Inlining with Offensive Fortunes"
             feature_flags: "--features inline-fortune,inline-off-fortunes,inline-cowsay"
     steps:
+      - uses: actions/checkout@v3
       - name: "Install Fixed Rust Toolchain"
         run: rustup default 1.80.1
       - name: Cargo Build
