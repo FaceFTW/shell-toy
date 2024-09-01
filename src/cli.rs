@@ -5,10 +5,12 @@ use crate::cowsay::BubbleType;
 #[derive(FromArgs)]
 /// various program options
 pub(crate) struct Options {
+    #[cfg(not(feature = "inline-cowsay"))]
     #[argh(option, short = 'c')]
     ///path to a direct cowfile
     pub cow_file: Option<String>,
 
+    #[cfg(not(feature = "inline-cowsay"))]
     #[argh(option)]
     ///path to a folder containing multiple cows we should search.
     pub cow_path: Option<String>,
@@ -30,7 +32,7 @@ pub(crate) struct Options {
     #[argh(positional)]
     pub message: Option<String>,
 
-    // #[cfg(feature = "inline")]
+    #[cfg(not(feature = "inline-fortune"))]
     #[argh(option, short = 'f', long = "fortune-file")]
     ///instead of using internal fortunes, which file/dir to look in
     pub fortune_file: Option<String>,

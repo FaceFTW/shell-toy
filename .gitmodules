@@ -1,6 +1,0 @@
-[submodule "fortunes"]
-	path = fortunes
-	url = https://github.com/shlomif/fortune-mod
-[submodule "cowsay"]
-	path = cowsay
-	url = https://github.com/cowsay-org/cowsay.git
