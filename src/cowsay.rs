@@ -190,7 +190,78 @@ impl StyleBuffer {
     }
 }
 
-fn derive_cow_str(parsed_chars: &[TerminalCharacter], current_style: &mut StyleBuffer) -> String {
+#[derive(Clone, Copy)]
+pub enum CowVariant {
+    Borg,
+    Dead,
+    Greedy,
+    Paranoid,
+    Stoned,
+    Tired,
+    Wired,
+    Young,
+    Default,
+    Random,
+}
+
+impl CowVariant {
+    fn get_eyes(&self) -> String {
+        match self {
+            CowVariant::Borg => String::from("=="),
+            CowVariant::Dead => String::from("xx"),
+            CowVariant::Greedy => String::from("$$"),
+            CowVariant::Paranoid => String::from("@@"),
+            CowVariant::Stoned => String::from("**"),
+            CowVariant::Tired => String::from("--"),
+            CowVariant::Wired => String::from("OO"),
+            CowVariant::Young => String::from(".."),
+            CowVariant::Default => String::from("oo"),
+            CowVariant::Random => panic!("This option should not be directly chosen!"),
+        }
+    }
+
+    fn get_toungue(&self) -> String {
+        match self {
+            CowVariant::Borg => String::from("  "),
+            CowVariant::Dead => String::from("U "),
+            CowVariant::Greedy => String::from("  "),
+            CowVariant::Paranoid => String::from("  "),
+            CowVariant::Stoned => String::from("U "),
+            CowVariant::Tired => String::from("  "),
+            CowVariant::Wired => String::from("  "),
+            CowVariant::Young => String::from("  "),
+            CowVariant::Default => String::from("  "),
+            CowVariant::Random => panic!("This option should not be directly chosen!"),
+        }
+    }
+}
+
+impl Default for CowVariant {
+    fn default() -> Self {
+        CowVariant::Default
+    }
+}
+
+const NON_RAND_VARIANTS: [CowVariant; 9] = [
+    CowVariant::Borg,
+    CowVariant::Dead,
+    CowVariant::Greedy,
+    CowVariant::Paranoid,
+    CowVariant::Stoned,
+    CowVariant::Tired,
+    CowVariant::Wired,
+    CowVariant::Young,
+    CowVariant::Default,
+];
+pub fn random_cow_variant(rng: &mut impl Rand) -> CowVariant {
+    NON_RAND_VARIANTS[rng.next_lim_usize(NON_RAND_VARIANTS.len())]
+}
+
+fn derive_cow_str(
+    parsed_chars: &[TerminalCharacter],
+    current_style: &mut StyleBuffer,
+    cow_variant: &CowVariant,
+) -> String {
     let mut environment: HashMap<String, Vec<TerminalCharacter>> = HashMap::new();
 
     let mut cow_started = false;
@@ -222,8 +293,12 @@ fn derive_cow_str(parsed_chars: &[TerminalCharacter], current_style: &mut StyleB
                 cow_string = cow_string + format!("{}", uchar.style(current_style.inner)).as_str()
             }
             TerminalCharacter::ThoughtPlaceholder => cow_string = cow_string + "\\",
-            TerminalCharacter::EyePlaceholder => cow_string = cow_string + "o o",
-            TerminalCharacter::TonguePlaceholder => cow_string = cow_string + "  ",
+            TerminalCharacter::EyePlaceholder => {
+                cow_string = cow_string + cow_variant.get_eyes().as_str()
+            }
+            TerminalCharacter::TonguePlaceholder => {
+                cow_string = cow_string + cow_variant.get_toungue().as_str()
+            }
             TerminalCharacter::Newline => {
                 if cow_started {
                     cow_string = cow_string + "\n";
@@ -237,7 +312,8 @@ fn derive_cow_str(parsed_chars: &[TerminalCharacter], current_style: &mut StyleB
                 let binding_val = environment
                     .get(binding)
                     .expect("Could not find a binding with the specified name");
-                cow_string = cow_string + derive_cow_str(&binding_val, current_style).as_str();
+                cow_string =
+                    cow_string + derive_cow_str(&binding_val, current_style, cow_variant).as_str();
             }
             TerminalCharacter::CowStart => cow_started = true,
             TerminalCharacter::EscapedUnicodeCharacter(character) => {
@@ -250,7 +326,7 @@ fn derive_cow_str(parsed_chars: &[TerminalCharacter], current_style: &mut StyleB
 }
 
 //Effectively a main function in the sense it does all the heavy lifting.
-pub fn print_cowsay(cowsay: &str, bubble: SpeechBubble, msg: &str) {
+pub fn print_cowsay(cowsay: &str, bubble: SpeechBubble, msg: &str, cow_variant: &CowVariant) {
     let mut nom_it = nom::combinator::iterator(cowsay, cow_parser);
 
     //Because colors will change before characters are created, we take an owo_colors style
@@ -259,6 +335,7 @@ pub fn print_cowsay(cowsay: &str, bubble: SpeechBubble, msg: &str) {
     let cow_str = derive_cow_str(
         nom_it.collect::<Vec<TerminalCharacter>>().as_slice(),
         &mut style_buffer,
+        cow_variant,
     );
     let msg_str = bubble
         .create(msg, 64 as usize)
