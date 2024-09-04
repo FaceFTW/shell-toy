@@ -6,7 +6,7 @@ mod parser;
 use cli::Options;
 #[cfg(not(feature = "inline-cowsay"))]
 use cowsay::identify_cow_path;
-use cowsay::{choose_random_cow, print_cowsay, SpeechBubble};
+use cowsay::{choose_random_cow, print_cowsay, random_cow_variant, CowVariant, SpeechBubble};
 #[cfg(not(feature = "inline-cowsay"))]
 use std::{fs::File, io::Read};
 use tinyrand::{Seeded, StdRand};
@@ -58,5 +58,15 @@ fn main() {
         }
     };
 
-    print_cowsay(&cow_str, SpeechBubble::new(options.bubble_type), &cow_msg);
+    let cow_variant = match options.cow_variant {
+        CowVariant::Random => random_cow_variant(&mut rng),
+        _ => options.cow_variant,
+    };
+
+    print_cowsay(
+        &cow_str,
+        SpeechBubble::new(options.bubble_type),
+        &cow_msg,
+        &cow_variant,
+    );
 }
