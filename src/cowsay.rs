@@ -442,20 +442,42 @@ pub fn get_cow_string(
     cow_path: &Option<String>,
     rng: &mut impl tinyrand::Rand,
 ) -> String {
+    let cow_path = identify_cow_path(cow_path);
     match cow_file {
-        Some(file_path) => match File::open(file_path) {
-            Ok(mut file) => {
-                let mut cow_str = String::new();
-                file.read_to_string(&mut cow_str)
-                    .expect("Error reading Cowfile");
-                cow_str
+        Some(cow_name_or_file) => {
+            //do a simple check, if we see no slashes and no .cow suffix,
+            // try looking in the cowpath if we can find it
+            if !cow_name_or_file.contains(std::path::MAIN_SEPARATOR)
+                && !cow_name_or_file.ends_with(".cow")
+            {
+                let cow_list = get_list_of_cows(&cow_path)
+                    .expect("Could not get a list of cows in the identified cow path");
+                let file_path = cow_list
+                    .into_iter()
+                    .find(|item| item.contains(cow_name_or_file) && item.ends_with(".cow"))
+                    .expect("Could not find a cow with the specified name in the defined cow path");
+                match File::open(file_path) {
+                    Ok(mut file) => {
+                        let mut cow_str = String::new();
+                        file.read_to_string(&mut cow_str)
+                            .expect("Error reading Cowfile");
+                        cow_str
+                    }
+                    Err(e) => panic!("{e}"),
+                }
+            } else {
+                match File::open(cow_name_or_file) {
+                    Ok(mut file) => {
+                        let mut cow_str = String::new();
+                        file.read_to_string(&mut cow_str)
+                            .expect("Error reading Cowfile");
+                        cow_str
+                    }
+                    Err(e) => panic!("{e}"),
+                }
             }
-            Err(e) => panic!("{e}"),
-        },
-        None => {
-            let cow_path = identify_cow_path(cow_path);
-            choose_random_cow(&cow_path, rng)
         }
+        None => choose_random_cow(&cow_path, rng),
     }
 }
 
