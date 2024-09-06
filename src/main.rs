@@ -6,7 +6,9 @@ mod parser;
 use cli::Options;
 #[cfg(not(feature = "inline-cowsay"))]
 use cowsay::identify_cow_path;
-use cowsay::{choose_random_cow, print_cowsay, random_cow_variant, CowVariant, SpeechBubble};
+use cowsay::{
+    choose_random_cow, get_cow_names, print_cowsay, random_cow_variant, CowVariant, SpeechBubble,
+};
 #[cfg(not(feature = "inline-cowsay"))]
 use std::{fs::File, io::Read};
 
@@ -20,35 +22,47 @@ fn main() {
 
     let options: Options = argh::from_env();
 
-    let cow_str = get_cow_string(&options, &mut rng);
+    //Short Circuits for other things (aside from help)
+    if options.list_cows {
+        //TODO I wish there was a more expressive way of doing this
+        let mut names_vec = get_cow_names();
+        names_vec.sort();
+        let mut names_iter = names_vec.into_iter();
+        let first_name = names_iter.next().unwrap();
+        let names_string =
+            names_iter.fold(String::from(first_name), |acc, e| format!("{acc}, {e}"));
+        println!("Available Cow Files:\n{names_string}");
+    } else {
+        let cow_str = get_cow_string(&options, &mut rng);
 
-    let cow_msg = match options.message {
-        Some(msg) => msg,
-        None => {
-            cfg_if::cfg_if! {
-                if #[cfg(feature="inline-fortune")]{
-                        fortune::get_inline_fortune(&mut rng, options.include_offensive)
-                            .expect("Could not read internal fortune index, your future is shrouded in mystery...")
-                } else {
-                    let fortune_file = fortune::choose_fortune_file(options.include_offensive, &mut rng, options.fortune_file );
-                    fortune::get_fortune(fortune_file, &mut rng)
-                .expect("Could not get a fortune, your future is shrouded in mystery...")
+        let cow_msg = match options.message {
+            Some(msg) => msg,
+            None => {
+                cfg_if::cfg_if! {
+                    if #[cfg(feature="inline-fortune")]{
+                            fortune::get_inline_fortune(&mut rng, options.include_offensive)
+                                .expect("Could not read internal fortune index, your future is shrouded in mystery...")
+                    } else {
+                        let fortune_file = fortune::choose_fortune_file(options.include_offensive, &mut rng, options.fortune_file );
+                        fortune::get_fortune(fortune_file, &mut rng)
+                    .expect("Could not get a fortune, your future is shrouded in mystery...")
+                    }
                 }
             }
-        }
-    };
+        };
 
-    let cow_variant = match options.cow_variant {
-        CowVariant::Random => random_cow_variant(&mut rng),
-        _ => options.cow_variant,
-    };
+        let cow_variant = match options.cow_variant {
+            CowVariant::Random => random_cow_variant(&mut rng),
+            _ => options.cow_variant,
+        };
 
-    print_cowsay(
-        &cow_str,
-        SpeechBubble::new(options.bubble_type),
-        &cow_msg,
-        &cow_variant,
-    );
+        print_cowsay(
+            &cow_str,
+            SpeechBubble::new(options.bubble_type),
+            &cow_msg,
+            &cow_variant,
+        );
+    }
 }
 
 #[cfg(feature = "inline-cowsay")]

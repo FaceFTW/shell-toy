@@ -15,7 +15,12 @@ pub(crate) struct Options {
     ///path to a folder containing multiple cows we should search.
     pub cow_path: Option<String>,
 
-    #[argh(option, short = 'o', default = "false")]
+    #[cfg(feature = "inline-cowsay")]
+    #[argh(switch, short = 'l', long = "list-cows")]
+    /// lists the cows that are embedded in the executable
+    pub list_cows: bool,
+
+    #[argh(switch, short = 'o')]
     /// whether to include offensive fortunes
     pub include_offensive: bool,
 

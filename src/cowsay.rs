@@ -354,6 +354,13 @@ pub fn get_cow_by_name(name: &str) -> Option<&str> {
         .find_map(|item| if item.0 == name { Some(item.1) } else { None })
 }
 
+//Asserting static lifetimes becuase the only data returned from this is based in executable
+//data and is not dynamically generated
+#[cfg(feature = "inline-cowsay")]
+pub fn get_cow_names() -> [&'static str; COW_DATA.len()] {
+    COW_DATA.map(|val| val.0)
+}
+
 #[cfg(not(feature = "inline-cowsay"))]
 pub fn choose_random_cow(cow_path: &PathBuf, rng: &mut impl Rand) -> String {
     use std::{
