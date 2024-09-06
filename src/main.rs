@@ -9,6 +9,7 @@ use cowsay::identify_cow_path;
 use cowsay::{choose_random_cow, print_cowsay, random_cow_variant, CowVariant, SpeechBubble};
 #[cfg(not(feature = "inline-cowsay"))]
 use std::{fs::File, io::Read};
+
 use tinyrand::{Seeded, StdRand};
 
 fn main() {
@@ -19,28 +20,7 @@ fn main() {
 
     let options: Options = argh::from_env();
 
-    cfg_if::cfg_if! {
-        if #[cfg(feature="inline-cowsay")]{
-            let cow_str = choose_random_cow(&mut rng);
-        } else {
-            let cow_str = match &options.cow_file {
-                 Some(file_path)=> {
-                    match File::open(file_path) {
-                        Ok(mut file) => {
-                            let mut cow_str = String::new();
-                            file.read_to_string(&mut cow_str)
-                                .expect("Error reading Cowfile");
-                            cow_str
-                        }
-                        Err(e) => panic!("{e}"),
-                    }
-                }
-                None => {
-                    let cow_path = identify_cow_path(&options.cow_path);
-                    choose_random_cow(&cow_path, &mut rng)
-                }
-            };
-    }};
+    let cow_str = get_cow_string(&options, &mut rng);
 
     let cow_msg = match options.message {
         Some(msg) => msg,
@@ -69,4 +49,35 @@ fn main() {
         &cow_msg,
         &cow_variant,
     );
+}
+
+#[cfg(feature = "inline-cowsay")]
+fn get_cow_string(opts: &Options, rng: &mut impl tinyrand::Rand) -> String {
+    use cowsay::get_cow_by_name;
+    if let Some(cow_name) = &opts.cow_file {
+        get_cow_by_name(&cow_name.as_str())
+            .expect("Could not find a cow with the specified name in the inlined data")
+            .to_string()
+    } else {
+        choose_random_cow(rng)
+    }
+}
+
+#[cfg(not(feature = "inline-cowsay"))]
+fn get_cow_string(opts: &Options, rng: &mut impl tinyrand::Rand) -> String {
+    let cow_str = match &options.cow_file {
+        Some(file_path) => match File::open(file_path) {
+            Ok(mut file) => {
+                let mut cow_str = String::new();
+                file.read_to_string(&mut cow_str)
+                    .expect("Error reading Cowfile");
+                cow_str
+            }
+            Err(e) => panic!("{e}"),
+        },
+        None => {
+            let cow_path = identify_cow_path(&options.cow_path);
+            choose_random_cow(&cow_path, &mut rng)
+        }
+    };
 }

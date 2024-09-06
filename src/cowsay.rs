@@ -270,10 +270,7 @@ fn derive_cow_str(
     for term_char in parsed_chars {
         match term_char {
             TerminalCharacter::Space => {
-                // if cow_started {
-                //Assume first whitespace we see is part of the cow to output
                 cow_string = cow_string + format!("{}", " ".style(current_style.inner)).as_str()
-                // }
             }
             TerminalCharacter::DefaultForegroundColor => current_style.default_color(),
             TerminalCharacter::DefaultBackgroundColor => current_style.on_default_color(),
@@ -348,6 +345,13 @@ pub fn print_cowsay(cowsay: &str, bubble: SpeechBubble, msg: &str, cow_variant: 
 pub fn choose_random_cow(rng: &mut impl Rand) -> String {
     let chosen_idx = rng.next_lim_usize(COW_DATA.len());
     COW_DATA[chosen_idx].1.to_string()
+}
+
+#[cfg(feature = "inline-cowsay")]
+pub fn get_cow_by_name(name: &str) -> Option<&str> {
+    COW_DATA
+        .into_iter()
+        .find_map(|item| if item.0 == name { Some(item.1) } else { None })
 }
 
 #[cfg(not(feature = "inline-cowsay"))]

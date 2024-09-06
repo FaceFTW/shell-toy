@@ -238,7 +238,12 @@ fn generate_cowsay_source() -> Result<(), std::io::Error> {
                     }
                     false => {
                         if item.path().extension().unwrap() == "cow" {
-                            let key = item.file_name().to_str().unwrap().to_string();
+                            let key = item
+                                .file_name()
+                                .to_str()
+                                .unwrap()
+                                .to_string()
+                                .replace(".cow", "");
                             match File::open(item.path()) {
                                 Ok(mut file) => {
                                     let mut value = String::new();

@@ -5,7 +5,7 @@ use crate::cowsay::{BubbleType, CowVariant};
 #[derive(FromArgs)]
 /// various program options
 pub(crate) struct Options {
-    #[cfg(not(feature = "inline-cowsay"))]
+    // #[cfg(not(feature = "inline-cowsay"))]
     #[argh(option, short = 'c')]
     ///path to a direct cowfile
     pub cow_file: Option<String>,
