@@ -1,0 +1,66 @@
+
+name: Release Generator
+
+on:
+  workflow_dispatch
+
+jobs:
+  windows-build:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        features: ["lite", "standard"]
+        triple: ['i686-pc-windows-msvc', 'x86_64-pc-windows-msvc', 'aarch64-pc-windows-msvc']
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust Toolchain
+        run: rustup toolchain install 1.80.1-${{ matrix.triple }}
+      - name: "Set Rust Toolchain"
+        run: rustup default 1.80.1
+      - name: Cargo Build
+        run: cargo build --features ${{ matrix.features }} --target ${{ matrix.triple }} --release -vv
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sh-toy-${{ matrix.triple }}
+          path: target/release/sh-toy.exe
+
+  macos-build:
+    runs-on: macos-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        features: ["lite", "standard"]
+        triple: ['aarch64-apple-darwin', 'x86_64-apple-darwin']
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust Toolchain
+        run: rustup toolchain install 1.80.1-${{ matrix.triple }}
+      - name: "Set Rust Toolchain"
+        run: rustup default 1.80.1
+      - name: Cargo Build
+        run: cargo build --features ${{ matrix.features }} --target ${{ matrix.triple }} --release -vv
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sh-toy-${{ matrix.triple }}
+          path: target/release/sh-toy
+
+  linux-build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        features: [lite, standard]
+        triple: [aarch64-unknown-linux-gnu, x86_64-unknown-linux-gnu, i686-unknown-linux-gnu, aarch64-unknown-linux-musl, x86_64-unknown-linux-musl, i686-unknown-linux-musl]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust Toolchain
+        run: rustup toolchain install 1.80.1-${{ matrix.triple }}
+      - name: "Set Rust Toolchain"
+        run: rustup default 1.80.1
+      - name: Cargo Build
+        run: cargo build --features ${{ matrix.features }} --target ${{ matrix.triple }} --release -vv
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sh-toy-${{ matrix.triple }}
+          path: target/release/sh-toy

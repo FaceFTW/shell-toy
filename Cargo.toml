@@ -43,7 +43,10 @@ default = []
 inline-fortune = []
 inline-off-fortune = []
 inline-cowsay = []
-
+# Easier Flags for identifying feature combos
+lite = []
+standard = ["inline-fortune", "inline-cowsay"]
+max = ["inline-fortune", "inline-off-fortune", "inline-cowsay"]
 
 [profile.release]
 codegen-units = 1
