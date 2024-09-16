@@ -1,5 +1,5 @@
 # shell-toy
-A `cowsay | fortune` implementation in Rust.
+A `fortune | cowsay` implementation in Rust.
 
 ***THIS IS STILL A WIP***
 ![Demo](./demo.gif)
