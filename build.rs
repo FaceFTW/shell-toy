@@ -1,4 +1,5 @@
 use std::{
+    // cell::RefCell,
     collections::HashMap,
     ffi::OsStr,
     fs::{self, remove_file, File},
@@ -356,6 +357,7 @@ fn get_source_archive(
         "unix" => {
             let mut p = std::process::Command::new("curl");
             p.args(&[
+                "-L",
                 path,
                 "--output",
                 format!("{downloads_path}/{resource_name}.zip").as_str()
@@ -367,7 +369,6 @@ fn get_source_archive(
         Consider modifying the get_external_resource function in build.rs since you are similar enough to an Arch Linux user :p")
     };
     proc.spawn()?.wait()?;
-
     Ok(())
 }
 
