@@ -24,7 +24,7 @@ jobs:
         run: cargo build --features ${{ matrix.features }} --target ${{ matrix.triple }} --release -vv
       - uses: actions/upload-artifact@v4
         with:
-          name: sh-toy-${{ matrix.triple }}
+          name: sh-toy-${{ matrix.features }}-${{ matrix.triple }}
           path: target/${{ matrix.triple }}/release/sh-toy.exe
 
   macos-build:
@@ -46,7 +46,7 @@ jobs:
         run: cargo build --features ${{ matrix.features }} --target ${{ matrix.triple }} --release -vv
       - uses: actions/upload-artifact@v4
         with:
-          name: sh-toy-${{ matrix.triple }}
+          name: sh-toy-${{ matrix.features }}-${{ matrix.triple }}
           path: target/${{ matrix.triple }}/release/sh-toy
 
   linux-build:
@@ -70,5 +70,5 @@ jobs:
         run: cargo build --features ${{ matrix.features }} --target ${{ matrix.triple }} --release -vv
       - uses: actions/upload-artifact@v4
         with:
-          name: sh-toy-${{ matrix.triple }}
+          name: sh-toy-${{ matrix.features }}-${{ matrix.triple }}
           path: target/${{ matrix.triple }}/release/sh-toy
