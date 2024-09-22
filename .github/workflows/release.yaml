@@ -2,7 +2,9 @@
 name: Release Generator
 
 on:
-  workflow_dispatch
+  push:
+    tags:
+      - "v*.*.*"
 
 jobs:
   windows-build:
@@ -21,10 +23,12 @@ jobs:
         run: rustup target add ${{ matrix.triple }}
       - name: Cargo Build
         run: cargo build --features ${{ matrix.features }} --target ${{ matrix.triple }} --release -vv
+      - name: Rename Release Artifact
+        run: copy target/${{ matrix.triple }}/release/sh-toy.exe sh-toy-${{ matrix.features }}-${{ matrix.triple }}.exe
       - uses: actions/upload-artifact@v4
         with:
           name: sh-toy-${{ matrix.features }}-${{ matrix.triple }}
-          path: target/${{ matrix.triple }}/release/sh-toy.exe
+          path: sh-toy-${{ matrix.features }}-${{ matrix.triple }}.exe
 
   macos-build:
     runs-on: macos-latest
@@ -42,10 +46,12 @@ jobs:
         run: rustup target add ${{ matrix.triple }}
       - name: Cargo Build
         run: cargo build --features ${{ matrix.features }} --target ${{ matrix.triple }} --release -vv
+      - name: Rename Release Artifact
+        run: cp target/${{ matrix.triple }}/release/sh-toy sh-toy-${{ matrix.features }}-${{ matrix.triple }}
       - uses: actions/upload-artifact@v4
         with:
           name: sh-toy-${{ matrix.features }}-${{ matrix.triple }}
-          path: target/${{ matrix.triple }}/release/sh-toy
+          path: sh-toy-${{ matrix.features }}-${{ matrix.triple }}
 
   linux-build:
     runs-on: ubuntu-latest
@@ -53,7 +59,7 @@ jobs:
       fail-fast: false
       matrix:
         features: [lite, standard]
-        triple: [aarch64-unknown-linux-gnu, x86_64-unknown-linux-gnu, i686-unknown-linux-gnu, aarch64-unknown-linux-musl, x86_64-unknown-linux-musl, i686-unknown-linux-musl]
+        triple: [x86_64-unknown-linux-gnu, i686-unknown-linux-gnu, x86_64-unknown-linux-musl, i686-unknown-linux-musl]
     steps:
       - uses: actions/checkout@v4
       - name: Install GCC Multi-lib
@@ -66,7 +72,23 @@ jobs:
         run: rustup target add ${{ matrix.triple }}
       - name: Cargo Build
         run: cargo build --features ${{ matrix.features }} --target ${{ matrix.triple }} --release -vv
+      - name: Rename Release Artifact
+        run: cp target/${{ matrix.triple }}/release/sh-toy sh-toy-${{ matrix.features }}-${{ matrix.triple }}
       - uses: actions/upload-artifact@v4
         with:
           name: sh-toy-${{ matrix.features }}-${{ matrix.triple }}
-          path: target/${{ matrix.triple }}/release/sh-toy
+          path: sh-toy-${{ matrix.features }}-${{ matrix.triple }}
+
+  release-gen:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    needs: ['windows-build','macos-build','linux-build']
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            **/sh-toy-*
