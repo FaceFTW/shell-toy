@@ -50,13 +50,14 @@ jobs:
   linux-build:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         features: [lite, standard]
         triple: [aarch64-unknown-linux-gnu, x86_64-unknown-linux-gnu, i686-unknown-linux-gnu, aarch64-unknown-linux-musl, x86_64-unknown-linux-musl, i686-unknown-linux-musl]
     steps:
       - uses: actions/checkout@v4
       - name: Install GCC Multi-lib
-        run: sudo apt update && sudo apt install gcc-multilib
+        run: sudo apt update && sudo apt install gcc-multilib g++-multilib lib32z1-dev
       - name: Install Rust Toolchain
         run: rustup toolchain install 1.80.1
       - name: "Set Rust Toolchain"
