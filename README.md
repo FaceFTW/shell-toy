@@ -19,8 +19,7 @@ This will install shell-toy to your local path as `sh-toy`. You can then put it 
 There are some compile-time features that enable shell-toy to perform certain things such as using an internal copy of fortunes embedded in the executable. This can be customized based on what you want. More details are below:
 | Feature                                                                                          | Description                                                                                                                                             |
 |--------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `inline-fortune`                                                                                 | Enables inlining fortunes in the compiled `sh-toy                                                                                                       |
-| ` executable. See [Compiling with Inline Things](#compiling-with-inline-things) for more details |
+| `inline-fortune`                                                                                 | Enables inlining fortunes in the compiled `sh-toy` executable. See [Compiling with Inline Things](#compiling-with-inline-things) for more details |
 | `inline-off-fortune`                                                                             | Also inlines Offensive fortunes. These are still blocked behind the `-o` flag                                                                           |
 | `inline-cowsay`                                                                                  | Enables inlining cowsay files in the compiles `sh-toy` executable. . See [Compiling with Inline Things](#compiling-with-inline-things) for more details |
 
