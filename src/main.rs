@@ -35,7 +35,7 @@ fn main() {
             None => {
                 cfg_if::cfg_if! {
                     if #[cfg(feature="inline-fortune")]{
-                            fortune::get_inline_fortune(&mut rng, options.include_offensive)
+                            fortune::get_inline_fortune(&mut rng, options.include_offensive, options.fortune_width, options.fortune_lines)
                                 .expect("Could not read internal fortune index, your future is shrouded in mystery...")
                     } else {
                         let fortune_file = fortune::choose_fortune_file(options.include_offensive, &mut rng, options.fortune_file );
