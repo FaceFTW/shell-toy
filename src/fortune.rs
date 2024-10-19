@@ -10,12 +10,35 @@ use tinyrand::Rand;
 
 ///default method of getting a fortune, without using the index file.
 #[cfg(not(feature = "inline-fortune"))]
-pub fn get_fortune(file_path: PathBuf, rng: &mut impl Rand) -> Result<String, Box<dyn Error>> {
+pub fn get_fortune(
+    file_path: PathBuf,
+    rng: &mut impl Rand,
+    max_width: Option<u64>,
+    max_lines: Option<u64>,
+) -> Result<String, Box<dyn Error>> {
     match File::open(file_path) {
         Ok(mut file) => {
             let mut string_buf = String::new();
             let _result = file.read_to_string(&mut string_buf)?;
-            let split: Vec<&str> = string_buf.split("\n%\n").collect();
+            let split: Vec<&str> = string_buf
+                .split("\n%\n")
+                .filter(|element| {
+                    (match max_width {
+                        Some(val) => element.len() <= val as usize,
+                        None => true,
+                    })
+                    //You can do this yes very cool
+                    &&(match max_lines {
+                        Some(val) => {
+                            element.chars().fold(0, |acc, e| match e == '\n' {
+                                true => acc + 1,
+                                false => acc,
+                            }) <= val
+                        }
+                        None => true,
+                    })
+                })
+                .collect();
             let chosen_idx = rng.next_lim_usize(split.len());
             Ok(split[chosen_idx].to_string())
         }
