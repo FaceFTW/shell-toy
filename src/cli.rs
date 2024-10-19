@@ -47,6 +47,16 @@ pub(crate) struct Options {
     ///instead of using internal fortunes, which file/dir to look in
     pub fortune_file: Option<String>,
 
+
+    #[argh(option, long = "max-fort-width")]
+    /// limits the chosen fortunes to be a maximum number of characters per line
+    pub fortune_width: Option<u64>,
+
+
+    #[argh(option, long = "max-fort-lines")]
+    /// limits the chosen fortunes to contain less than the specified number of lines
+    pub fortune_lines: Option<u64>,
+
     #[argh(switch, short = 'o')]
     /// whether to include offensive fortunes
     pub include_offensive: bool,

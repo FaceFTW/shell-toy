@@ -39,7 +39,7 @@ fs_extra = "1.3"
 
 
 [features]
-default = []
+default = ["inline-fortune", "inline-off-fortune"]
 inline-fortune = []
 inline-off-fortune = []
 inline-cowsay = []
