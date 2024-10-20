@@ -1,6 +1,6 @@
 [package]
 name = "shell-toy"
-version = "0.5.1"
+version = "0.6.0"
 edition = "2021"
 description = "A \"fortune | cowsay\" implementation in Rust, i.e. a nice little toy to liven up your shell."
 license = "MIT"
