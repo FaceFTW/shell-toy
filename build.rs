@@ -63,7 +63,7 @@ fn main() -> Result<(), std::io::Error> {
                 &config.fortune_mod.exclude,
             )?;
         }
-        create_fortune_db()?;
+        create_fortune_db(&config.settings)?;
     }
 
     Ok(())
@@ -86,7 +86,7 @@ macro_rules! check_dir_exists {
     };
 }
 
-fn create_fortune_db() -> Result<(), std::io::Error> {
+fn create_fortune_db(settings: &BuildSettings) -> Result<(), std::io::Error> {
     /***************************************
      * Function Definitions (Because this is easier to fold)
      ***************************************/
@@ -145,7 +145,38 @@ fn create_fortune_db() -> Result<(), std::io::Error> {
         (fortune_buf, off_fortune_buf)
     }
 
-    fn gen_fortune_db(path: String) -> Result<(), io::Error> {
+    ///Function used for the filter iterators
+    fn check_fortune_constraints(
+        element: &&str,
+        max_width: &Option<u64>,
+        max_lines: &Option<u64>,
+    ) -> bool {
+        (match max_width {
+        Some(val) =>
+            element
+                .split("\n")
+                .reduce(|acc, e| if e.len() > acc.len(){e} else {acc})
+                .expect("Could not split the chosen string for constraint validation")
+                .len() <= *val as usize,
+        None => true,
+    })
+    //You can do this yes very cool
+    &&(match max_lines {
+        Some(val) => {
+            element.chars().fold(0, |acc, e| match e == '\n' {
+                true => acc + 1,
+                false => acc,
+            }) <= *val
+        }
+        None => true,
+    })
+    }
+
+    fn gen_fortune_db(
+        path: String,
+        max_width: &Option<u64>,
+        max_lines: &Option<u64>,
+    ) -> Result<(), io::Error> {
         println!("cargo::rerun-if-changed={path}");
 
         let mut concat_fortunes: String;
@@ -170,9 +201,16 @@ fn create_fortune_db() -> Result<(), std::io::Error> {
             }
         }
 
-        let fortunes_split: Vec<&str> = concat_fortunes.split("\n%\n").collect();
+        //TODO probably need to pass settings as param no closure capture here
+        let fortunes_split: Vec<&str> = concat_fortunes
+            .split("\n%\n")
+            .filter(|element| check_fortune_constraints(element, max_width, max_lines))
+            .collect();
         let num_fortunes = fortunes_split.len();
-        let off_fortunes_split: Vec<&str> = off_concat_fortunes.split("\n%\n").collect();
+        let off_fortunes_split: Vec<&str> = off_concat_fortunes
+            .split("\n%\n")
+            .filter(|element| check_fortune_constraints(element, max_width, max_lines))
+            .collect();
         let num_off_fortunes = off_fortunes_split.len();
 
         let fortune_arr = quote::quote! {
@@ -199,6 +237,7 @@ fn create_fortune_db() -> Result<(), std::io::Error> {
 
         Ok(())
     }
+
     /***************************************
      * The actual build steps
      ***************************************/
@@ -208,14 +247,18 @@ fn create_fortune_db() -> Result<(), std::io::Error> {
     if check_env_flag!("USE_DEFAULT_RESOURCES")
         || (!check_env_flag!("FORTUNE_FILE") && !(check_env_flag!("FORTUNE_PATH")))
     {
-        gen_fortune_db(String::from("target/resources/fortune"))
+        gen_fortune_db(
+            String::from("target/resources/fortune"),
+            &settings.max_width,
+            &settings.max_lines,
+        )
     } else {
         if let Ok(val) = std::env::var("FORTUNE_FILE") {
             println!("cargo::rerun-if-changed={val}");
-            gen_fortune_db(val)
+            gen_fortune_db(val, &settings.max_width, &settings.max_lines)
         } else if let Ok(val) = std::env::var("FORTUNE_PATH") {
             println!("cargo::rerun-if-changed={val}");
-            gen_fortune_db(val)
+            gen_fortune_db(val, &settings.max_width, &settings.max_lines)
         } else {
             panic!("Unexpected else branch hit toward end of create_fortune_db")
         }
@@ -445,10 +488,19 @@ struct ResourceConfig {
 }
 
 #[derive(serde::Deserialize, Debug)]
+struct BuildSettings {
+    #[serde(rename = "max-fortune-line-len")]
+    pub max_width: Option<u64>,
+    #[serde(rename = "max-fortune-lines")]
+    pub max_lines: Option<u64>,
+}
+
+#[derive(serde::Deserialize, Debug)]
 struct BuildConfig {
     pub cowsay: ResourceConfig,
     #[serde(rename = "fortune-mod")]
     pub fortune_mod: ResourceConfig,
+    pub settings: BuildSettings,
 }
 
 fn get_config() -> Result<BuildConfig, std::io::Error> {
