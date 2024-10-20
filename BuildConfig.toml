@@ -12,5 +12,5 @@ source-zip-url = "https://github.com/shlomif/fortune-mod/archive/refs/heads/mast
 resource-location = "fortune-mod-master/fortune-mod/datfiles"
 
 [settings]
-max-fortune-line-len = 60
-max-fortune-lines = 3
+# max-fortune-line-len = 60
+max-fortune-lines = 1
