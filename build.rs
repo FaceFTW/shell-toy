@@ -152,7 +152,12 @@ fn create_fortune_db(settings: &BuildSettings) -> Result<(), std::io::Error> {
         max_lines: &Option<u64>,
     ) -> bool {
         (match max_width {
-        Some(val) => element.len() <= *val as usize,
+        Some(val) =>
+            element
+                .split("\n")
+                .reduce(|acc, e| if e.len() > acc.len(){e} else {acc})
+                .expect("Could not split the chosen string for constraint validation")
+                .len() <= *val as usize,
         None => true,
     })
     //You can do this yes very cool
