@@ -442,7 +442,6 @@ pub fn get_cow_string(
     cow_path: &Option<String>,
     rng: &mut impl tinyrand::Rand,
 ) -> String {
-    let cow_path = identify_cow_path(cow_path);
     match cow_file {
         Some(cow_name_or_file) => {
             //do a simple check, if we see no slashes and no .cow suffix,
@@ -450,6 +449,7 @@ pub fn get_cow_string(
             if !cow_name_or_file.contains(std::path::MAIN_SEPARATOR)
                 && !cow_name_or_file.ends_with(".cow")
             {
+                let cow_path = identify_cow_path(cow_path);
                 let cow_list = get_list_of_cows(&cow_path)
                     .expect("Could not get a list of cows in the identified cow path");
                 let file_path = cow_list
@@ -477,7 +477,10 @@ pub fn get_cow_string(
                 }
             }
         }
-        None => choose_random_cow(&cow_path, rng),
+        None => {
+            let cow_path = identify_cow_path(cow_path);
+            choose_random_cow(&cow_path, rng)
+        }
     }
 }
 
