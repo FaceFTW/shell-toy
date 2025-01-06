@@ -271,6 +271,7 @@ fn derive_cow_str(
     let mut cow_started = false;
     //TODO Determine if we should pre-allocate the memory with an "estimate" for performance
     let mut cow_string = String::new();
+
     for term_char in parsed_chars {
         match term_char {
             TerminalCharacter::Space => {
@@ -329,12 +330,31 @@ fn derive_cow_str(
 //Effectively a main function in the sense it does all the heavy lifting.
 pub fn print_cowsay(cowsay: &str, bubble: SpeechBubble, msg: &str, cow_variant: &CowVariant) {
     let mut nom_it = nom::combinator::iterator(cowsay, cow_parser);
+    //Prevent multiple consecutive newlines from being printed.
+    let scan_it = nom_it.scan(false, |state, parsed| match parsed {
+        TerminalCharacter::Newline => {
+            if *state {
+                None
+            } else {
+                *state = true;
+                Some(parsed)
+            }
+        }
+        TerminalCharacter::Comment => {
+            *state = *state;
+            Some(parsed)
+        } //Should not alter newline state since it's not interpreted
+        _ => {
+            *state = false;
+            Some(parsed)
+        }
+    });
 
     //Because colors will change before characters are created, we take an owo_colors style
     // and use it as the "current style under tracking". As we created the string, we apply the style necessary to each character
     let mut style_buffer = StyleBuffer::new();
     let cow_str = derive_cow_str(
-        nom_it.collect::<Vec<TerminalCharacter>>().as_slice(),
+        scan_it.collect::<Vec<TerminalCharacter>>().as_slice(),
         &mut style_buffer,
         cow_variant,
     );
