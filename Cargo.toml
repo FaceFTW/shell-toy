@@ -1,6 +1,6 @@
 [package]
 name = "shell-toy"
-version = "0.6.0"
+version = "0.6.1"
 edition = "2021"
 description = "A \"fortune | cowsay\" implementation in Rust, i.e. a nice little toy to liven up your shell."
 license = "MIT"
@@ -20,7 +20,7 @@ getrandom = "0.2"
 argh = "0.1"
 textwrap = "0.16"
 strip-ansi-escapes = "0.2"
-unicode-width = "0.1"
+unicode-width = "0.2"
 cfg-if = "1"
 
 [build-dependencies]
