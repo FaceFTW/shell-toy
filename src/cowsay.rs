@@ -329,7 +329,7 @@ fn derive_cow_str(
 
 //Effectively a main function in the sense it does all the heavy lifting.
 pub fn print_cowsay(cowsay: &str, bubble: SpeechBubble, msg: &str, cow_variant: &CowVariant) {
-    let mut nom_it = nom::combinator::iterator(cowsay, cow_parser);
+    let nom_it = nom::combinator::iterator(cowsay, cow_parser);
     //Prevent multiple consecutive newlines from being printed.
     let scan_it = nom_it.scan(false, |state, parsed| match parsed {
         TerminalCharacter::Newline => {

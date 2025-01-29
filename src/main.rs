@@ -13,7 +13,7 @@ use tinyrand::{Seeded, StdRand};
 fn main() {
     //Init RNG
     let mut buf = [0u8; 8];
-    getrandom::getrandom(&mut buf).expect("Could not open entropy source!");
+    getrandom::fill(&mut buf).expect("Could not open entropy source!");
     let mut rng = StdRand::seed(u64::from_le_bytes(buf));
 
     let options: Options = argh::from_env();

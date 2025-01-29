@@ -6,8 +6,8 @@ use nom::{
     character::complete::{alphanumeric1, char, digit1, space0},
     combinator::{map, opt},
     error::ParseError,
-    sequence::{delimited, preceded, tuple},
-    IResult,
+    sequence::{delimited, preceded},
+    IResult, Parser,
 };
 
 //For lack of a better name
@@ -37,7 +37,8 @@ fn spaces_and_lines(input: &str) -> IResult<&str, TerminalCharacter> {
         map(tag("\r\n"), |_| TerminalCharacter::Newline),
         map(tag("\n"), |_| TerminalCharacter::Newline),
         map(tag(" "), |_| TerminalCharacter::Space),
-    ))(input)
+    ))
+    .parse(input)
 }
 
 fn misc_escapes<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, TerminalCharacter, E> {
@@ -48,20 +49,21 @@ fn misc_escapes<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, Term
             "49" => TerminalCharacter::DefaultBackgroundColor,
             _ => panic!(), //TODO Change this to some error handling
         },
-    )(i)
+    )
+    .parse(i)
 }
 
 fn colors_256<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, TerminalCharacter, E> {
     map(
         delimited(
             tag("\\e["),
-            tuple((
+            (
                 alt((tag("38"), tag("48"))),
                 tag(";"),
                 tag("5"),
                 tag(";"),
                 digit1,
-            )),
+            ),
             tag("m"),
         ),
         |(color_type, _, _, _, color)| match color_type {
@@ -69,14 +71,15 @@ fn colors_256<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, Termin
             "48" => TerminalCharacter::TerminalBackgroundColor256(str::parse(color).unwrap()),
             _ => panic!(), //TODO change this to some kind of error handling
         },
-    )(i)
+    )
+    .parse(i)
 }
 
 fn truecolor<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, TerminalCharacter, E> {
     map(
         delimited(
             tag("\\e["),
-            tuple((
+            (
                 alt((tag("38"), tag("48"))),
                 tag(";"),
                 tag("2"),
@@ -86,7 +89,7 @@ fn truecolor<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, Termina
                 digit1,
                 tag(";"),
                 digit1,
-            )),
+            ),
             tag("m"),
         ),
         |(color_type, _, _, _, red, _, green, _, blue)| {
@@ -104,23 +107,25 @@ fn truecolor<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, Termina
                 _ => panic!(), //TODO change this to some kind of error handling
             }
         },
-    )(i)
+    )
+    .parse(i)
 }
 
 fn binding_name<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, &'a str, E> {
-    map(tuple((char('$'), alphanumeric1)), |(_, name)| name)(i)
+    map((char('$'), alphanumeric1), |(_, name)| name).parse(i)
 }
 
 fn binding_value<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, &'a str, E> {
     map(
-        tuple((
+        (
             char('"'),
             take_until1("\";"),
             tag("\";"),
             opt(alt((tag("\n"), tag("\r\n")))),
-        )),
+        ),
         |(_, binding_val, _, _)| binding_val,
-    )(i)
+    )
+    .parse(i)
 }
 
 fn var_binding<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, TerminalCharacter, E> {
@@ -132,15 +137,16 @@ fn var_binding<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, Termi
     //4. If the line contianing the binding ends with a newline, take it since this isn't an actual part of the COWFILE
     //5. We are intentionally ignoring any bound variable calls in the binding value since it would literally be a pain in the ass to set up an "environment" for expanding the values
     map(
-        tuple((binding_name, space0, char('='), space0, binding_value)),
+        (binding_name, space0, char('='), space0, binding_value),
         |(binding_name, _, _, _, binding_value)| {
-            let mut nom_it = nom::combinator::iterator(binding_value, cow_parser_no_vars);
+            let nom_it = nom::combinator::iterator(binding_value, cow_parser_no_vars);
             TerminalCharacter::VarBinding(
                 binding_name.to_string(),
                 nom_it.collect::<Vec<TerminalCharacter>>(),
             )
         },
-    )(i)
+    )
+    .parse(i)
 }
 
 fn bound_var_call<'a, E: ParseError<&'a str>>(
@@ -148,7 +154,8 @@ fn bound_var_call<'a, E: ParseError<&'a str>>(
 ) -> IResult<&'a str, TerminalCharacter, E> {
     map(binding_name, |name| {
         TerminalCharacter::BoundVarCall(name.to_string())
-    })(i)
+    })
+    .parse(i)
 }
 
 fn unicode_char<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, TerminalCharacter, E> {
@@ -170,20 +177,23 @@ fn unicode_char<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, Term
                 char::from_u32(u32::from_str_radix(code, 16).unwrap()).unwrap(),
             )
         }),
-    ))(i)
+    ))
+    .parse(i)
 }
 
 //Fallback for a character that has an explicit escape
 fn escaped_char<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, TerminalCharacter, E> {
     map(preceded(tag("\\"), take(1usize)), |character: &str| {
         TerminalCharacter::EscapedUnicodeCharacter(character.chars().next().unwrap())
-    })(i)
+    })
+    .parse(i)
 }
 
 fn comments<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, TerminalCharacter, E> {
     map(preceded(tag("#"), take_until("\n")), |_| {
         TerminalCharacter::Comment
-    })(i)
+    })
+    .parse(i)
 }
 
 ///This parser is for random perl junk we see in files that we want to ignore since we aren't really a perl interpreter
@@ -220,14 +230,16 @@ fn perl_junk<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, Termina
             )),
             |_| TerminalCharacter::CowStart,
         ),
-    ))(i)
+    ))
+    .parse(i)
 }
 fn placeholders<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, TerminalCharacter, E> {
     alt((
         map(tag("$thoughts"), |_| TerminalCharacter::ThoughtPlaceholder),
         map(tag("$eyes"), |_| TerminalCharacter::EyePlaceholder),
         map(tag("$tongue"), |_| TerminalCharacter::TonguePlaceholder),
-    ))(i)
+    ))
+    .parse(i)
 }
 
 ///This is a variant of the main parser that ignores bindings for the sake of preventing
@@ -246,7 +258,8 @@ fn cow_parser_no_vars(input: &str) -> IResult<&str, TerminalCharacter> {
             //TODO I don't like this
             TerminalCharacter::UnicodeCharacter(c.chars().into_iter().next().unwrap())
         }),
-    ))(input)
+    ))
+    .parse(input)
 }
 
 pub fn cow_parser(input: &str) -> IResult<&str, TerminalCharacter> {
@@ -266,5 +279,6 @@ pub fn cow_parser(input: &str) -> IResult<&str, TerminalCharacter> {
             //TODO I don't like this
             TerminalCharacter::UnicodeCharacter(c.chars().into_iter().next().unwrap())
         }),
-    ))(input)
+    ))
+    .parse(input)
 }
