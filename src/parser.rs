@@ -190,7 +190,7 @@ fn escaped_char<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, Term
 }
 
 fn comments<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, TerminalCharacter, E> {
-    map(preceded(tag("#"), take_until("\n")), |_| {
+    map((preceded(tag("#"), take_until("\n")), tag("\n")), |_| {
         TerminalCharacter::Comment
     })
     .parse(i)
