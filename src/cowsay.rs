@@ -331,12 +331,13 @@ fn derive_cow_str(
 pub fn print_cowsay(cowsay: &str, bubble: SpeechBubble, msg: &str, cow_variant: &CowVariant) {
     let nom_it = nom::combinator::iterator(cowsay, cow_parser);
     //Prevent multiple consecutive newlines from being printed.
-    let scan_it = nom_it.scan(false, |state, parsed| match parsed {
+    //state.0 = is cow started, state.1 is if we encountered newline previously
+    let scan_it = nom_it.scan((false, false), |state, parsed| match parsed {
         TerminalCharacter::Newline => {
-            if *state {
+            if state.1 {
                 None
             } else {
-                *state = true;
+                *state = (state.0, state.0);    //Only true if cow started
                 Some(parsed)
             }
         }
@@ -344,8 +345,12 @@ pub fn print_cowsay(cowsay: &str, bubble: SpeechBubble, msg: &str, cow_variant: 
             *state = *state;
             Some(parsed)
         } //Should not alter newline state since it's not interpreted
+        TerminalCharacter::CowStart => {
+            *state = (true, state.1);
+            Some(parsed)
+        }
         _ => {
-            *state = false;
+            *state = (state.0, false);
             Some(parsed)
         }
     });

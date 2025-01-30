@@ -47,11 +47,9 @@ pub(crate) struct Options {
     ///instead of using internal fortunes, which file/dir to look in
     pub fortune_file: Option<String>,
 
-
     #[argh(option, long = "max-fort-width")]
     /// limits the chosen fortunes to be a maximum number of characters per line
     pub fortune_width: Option<u64>,
-
 
     #[argh(option, long = "max-fort-lines")]
     /// limits the chosen fortunes to contain less than the specified number of lines
@@ -60,6 +58,10 @@ pub(crate) struct Options {
     #[argh(switch, short = 'o')]
     /// whether to include offensive fortunes
     pub include_offensive: bool,
+
+    // #[argh(switch, long = "debug")]
+    /// debug mode to show internal rep of a cowfile
+    // pub enable_debug: bool,
 
     #[argh(positional)]
     pub message: Option<String>,

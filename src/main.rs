@@ -51,6 +51,13 @@ fn main() {
             _ => options.cow_variant,
         };
 
+        //Useful little snippet for debugging cowfiles. Commented out usually
+        // if options.enable_debug {
+        //     let nom_it: Vec<_> =
+        //         nom::combinator::iterator(cow_str.as_str(), parser::cow_parser).collect();
+        //         dbg!(nom_it);
+        // }
+
         print_cowsay(
             &cow_str,
             SpeechBubble::new(options.bubble_type),
