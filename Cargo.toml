@@ -1,7 +1,7 @@
 [package]
 name = "shell-toy"
 version = "0.6.3"
-edition = "2021"
+edition = "2024"
 description = "A \"fortune | cowsay\" implementation in Rust, i.e. a nice little toy to liven up your shell."
 license = "MIT"
 repository = "https://github.com/FaceFTW/shell-toy"
