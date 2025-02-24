@@ -46,7 +46,8 @@ pub fn get_fortune(
         Ok(mut file) => {
             let mut string_buf = String::new();
             let _result = file.read_to_string(&mut string_buf)?;
-            let split: Vec<&str> = string_buf
+            let no_cr = string_buf.replace("\r", "");
+            let split: Vec<&str> = no_cr
                 .split("\n%\n")
                 .filter(|element| check_fortune_constraints(element, max_width, max_lines))
                 .collect();
@@ -76,9 +77,15 @@ pub fn choose_fortune_file(
         choose_random_file(&PathBuf::from(val.as_str()), include_offensive, rng)
             .expect("Could not choose a random fortune file from the specified Fortune Path")
     } else {
-        match os{
-            "linux" => choose_fortune_file(include_offensive, rng,Some(String::from("/usr/share/games/fortunes"))),
-            _ => panic!("I don't know what the default path for fortunes are for this OS!.\nPlease provide a FORTUNEPATH or FORTUNE_PATH environment variable, or a single file with FORTUNE_FILE")
+        match os {
+            "linux" => choose_fortune_file(
+                include_offensive,
+                rng,
+                Some(String::from("/usr/share/games/fortunes")),
+            ),
+            _ => panic!(
+                "I don't know what the default path for fortunes are for this OS!.\nPlease provide a FORTUNEPATH or FORTUNE_PATH environment variable, or a single file with FORTUNE_FILE"
+            ),
         }
     }
 }
