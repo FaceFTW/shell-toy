@@ -5,7 +5,7 @@ mod parser;
 
 use cli::Options;
 use cowsay::{
-    get_cow_names, get_cow_string, print_cowsay, random_cow_variant, CowVariant, SpeechBubble,
+    CowVariant, SpeechBubble, get_cow_names, get_cow_string, print_cowsay, random_cow_variant,
 };
 
 use tinyrand::{Seeded, StdRand};

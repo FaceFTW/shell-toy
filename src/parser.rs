@@ -1,17 +1,17 @@
 ///Imaging writing an entire parser for a Perl-like language just for a tiny little tool
 /// couldn't be me hahahahahahaha
 use nom::{
+    IResult, Parser,
     branch::alt,
     bytes::complete::{tag, take, take_until, take_until1},
     character::complete::{alphanumeric1, char, digit1, space0},
     combinator::{map, opt},
-    error::ParseError,
+    multi::many0,
     sequence::{delimited, preceded},
-    IResult, Parser,
 };
 
 //For lack of a better name
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TerminalCharacter {
     Space,
     DefaultForegroundColor,
@@ -32,7 +32,7 @@ pub enum TerminalCharacter {
     CowStart,
 }
 
-fn spaces_and_lines(input: &str) -> IResult<&str, TerminalCharacter> {
+fn spaces_and_lines<'a>(input: &'a str) -> IResult<&'a str, TerminalCharacter> {
     alt((
         map(tag("\r\n"), |_| TerminalCharacter::Newline),
         map(tag("\n"), |_| TerminalCharacter::Newline),
@@ -41,7 +41,7 @@ fn spaces_and_lines(input: &str) -> IResult<&str, TerminalCharacter> {
     .parse(input)
 }
 
-fn misc_escapes<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, TerminalCharacter, E> {
+fn misc_escapes<'a>(i: &'a str) -> IResult<&'a str, TerminalCharacter> {
     map(
         delimited(tag("\\e["), alt((tag("39"), tag("49"))), tag("m")),
         |esc: &str| match esc {
@@ -53,7 +53,7 @@ fn misc_escapes<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, Term
     .parse(i)
 }
 
-fn colors_256<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, TerminalCharacter, E> {
+fn colors_256<'a>(i: &'a str) -> IResult<&'a str, TerminalCharacter> {
     map(
         delimited(
             tag("\\e["),
@@ -75,7 +75,7 @@ fn colors_256<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, Termin
     .parse(i)
 }
 
-fn truecolor<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, TerminalCharacter, E> {
+fn truecolor<'a>(i: &'a str) -> IResult<&'a str, TerminalCharacter> {
     map(
         delimited(
             tag("\\e["),
@@ -111,11 +111,11 @@ fn truecolor<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, Termina
     .parse(i)
 }
 
-fn binding_name<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, &'a str, E> {
+fn binding_name<'a>(i: &'a str) -> IResult<&'a str, &'a str> {
     map((char('$'), alphanumeric1), |(_, name)| name).parse(i)
 }
 
-fn binding_value<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, &'a str, E> {
+fn binding_value<'a>(i: &'a str) -> IResult<&'a str, &'a str> {
     map(
         (
             char('"'),
@@ -128,7 +128,7 @@ fn binding_value<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, &'a
     .parse(i)
 }
 
-fn var_binding<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, TerminalCharacter, E> {
+fn var_binding<'a>(i: &'a str) -> IResult<&'a str, TerminalCharacter> {
     //some assumptions of format we will be making here because perl has no BNF
     //1. Vars start with $, and are alphanumeric characters (at least one)
     //2. equals sign padded by any number of spaces on each side
@@ -149,16 +149,14 @@ fn var_binding<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, Termi
     .parse(i)
 }
 
-fn bound_var_call<'a, E: ParseError<&'a str>>(
-    i: &'a str,
-) -> IResult<&'a str, TerminalCharacter, E> {
+fn bound_var_call<'a>(i: &'a str) -> IResult<&'a str, TerminalCharacter> {
     map(binding_name, |name| {
         TerminalCharacter::BoundVarCall(name.to_string())
     })
     .parse(i)
 }
 
-fn unicode_char<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, TerminalCharacter, E> {
+fn unicode_char<'a>(i: &'a str) -> IResult<&'a str, TerminalCharacter> {
     //Turns out, there are different ways to parse unicode escapes.
     //This is my best attempt at covering them
     alt((
@@ -182,14 +180,14 @@ fn unicode_char<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, Term
 }
 
 //Fallback for a character that has an explicit escape
-fn escaped_char<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, TerminalCharacter, E> {
+fn escaped_char<'a>(i: &'a str) -> IResult<&'a str, TerminalCharacter> {
     map(preceded(tag("\\"), take(1usize)), |character: &str| {
         TerminalCharacter::EscapedUnicodeCharacter(character.chars().next().unwrap())
     })
     .parse(i)
 }
 
-fn comments<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, TerminalCharacter, E> {
+fn comments<'a>(i: &'a str) -> IResult<&'a str, TerminalCharacter> {
     map((preceded(tag("#"), take_until("\n")), tag("\n")), |_| {
         TerminalCharacter::Comment
     })
@@ -198,7 +196,7 @@ fn comments<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, Terminal
 
 ///This parser is for random perl junk we see in files that we want to ignore since we aren't really a perl interpreter
 /// Some of it *is* useful when it comes to acting as a "barrier" between actual text we want to parse
-fn perl_junk<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, TerminalCharacter, E> {
+fn perl_junk<'a>(i: &'a str) -> IResult<&'a str, TerminalCharacter> {
     alt((
         map(
             alt((
@@ -233,7 +231,8 @@ fn perl_junk<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, Termina
     ))
     .parse(i)
 }
-fn placeholders<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, TerminalCharacter, E> {
+
+fn placeholders<'a>(i: &'a str) -> IResult<&'a str, TerminalCharacter> {
     alt((
         map(tag("$thoughts"), |_| TerminalCharacter::ThoughtPlaceholder),
         map(tag("$eyes"), |_| TerminalCharacter::EyePlaceholder),
@@ -242,12 +241,31 @@ fn placeholders<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, Term
     .parse(i)
 }
 
-///This is a variant of the main parser that ignores bindings for the sake of preventing
-/// recursive binding parsing since we have no "environment" to fetch from
-fn cow_parser_no_vars(input: &str) -> IResult<&str, TerminalCharacter> {
-    alt((
-        comments,
-        perl_junk,
+fn cow_string<'a>(i: &'a str) -> IResult<&'a str, Vec<TerminalCharacter>> {
+    //NOTE this makes a flawed assumption where the perl delimiters don't have to match. But FWIW
+    //it is not a significant bug honestly, most of these scripts _should_ be functional in OG perl
+    let start = (
+        tag("$the_cow"),
+        space0,
+        tag("="),
+        alt((
+            map(
+                (
+                    space0,
+                    tag("<<"),
+                    space0,
+                    alt((tag("\"EOC\""), tag("EOC"))),
+                    opt(tag(";")),
+                    opt(tag("\r")),
+                    tag("\n"),
+                ),
+                |_| (),
+            ),
+            map((tag("@\""), opt(tag("\r")), tag("n")), |_| ()),
+        )),
+    );
+
+    let valid_chars = alt((
         placeholders,
         spaces_and_lines,
         misc_escapes,
@@ -255,11 +273,17 @@ fn cow_parser_no_vars(input: &str) -> IResult<&str, TerminalCharacter> {
         truecolor,
         unicode_char,
         map(take(1 as usize), |c: &str| {
-            //TODO I don't like this
             TerminalCharacter::UnicodeCharacter(c.chars().into_iter().next().unwrap())
         }),
-    ))
-    .parse(input)
+    ));
+
+    let end = (alt((tag("EOC"), tag("\"@"))), opt(tag("\r")), tag("\n"));
+    delimited(start, many0(valid_chars), end)
+        .map(|mut chars| {
+            chars.insert(0usize, TerminalCharacter::CowStart);
+            chars
+        })
+        .parse(i)
 }
 
 pub fn cow_parser(input: &str) -> IResult<&str, TerminalCharacter> {
@@ -276,7 +300,6 @@ pub fn cow_parser(input: &str) -> IResult<&str, TerminalCharacter> {
         unicode_char,
         escaped_char,
         map(take(1 as usize), |c: &str| {
-            //TODO I don't like this
             TerminalCharacter::UnicodeCharacter(c.chars().into_iter().next().unwrap())
         }),
     ))
