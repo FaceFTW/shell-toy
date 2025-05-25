@@ -59,9 +59,9 @@ pub(crate) struct Options {
     /// whether to include offensive fortunes
     pub include_offensive: bool,
 
-    // #[argh(switch, long = "debug")]
+    #[argh(switch, long = "debug")]
     /// debug mode to show internal rep of a cowfile
-    // pub enable_debug: bool,
+    pub enable_debug: bool,
 
     #[argh(positional)]
     pub message: Option<String>,
