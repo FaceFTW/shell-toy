@@ -19,7 +19,12 @@
 					"kind": "bin"
 				}
 			},
-			"args": [],
+			"args": [
+				"-c",
+				"${workspaceFolder}/cows/001_bulbasaur.cow",
+				"-f",
+				"C:\\Users\\awest\\.config\\fortunes.txt"
+			],
 			"cwd": "${workspaceFolder}"
 		},
 		{

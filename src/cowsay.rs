@@ -14,8 +14,8 @@ use strip_ansi_escapes::strip;
 use textwrap::fill;
 use tinyrand::Rand;
 use unicode_width::UnicodeWidthStr;
-use winnow::Parser;
-use winnow::error::ContextError;
+use winnow::error::{ContextError, StrContext, TreeError};
+use winnow::{Parser, error::TreeErrorContext};
 /***************************/
 //The following code is derived and modified from latipun7/charasay (MIT Licensed Code)
 //Original Source Link: https://github.com/latipun7/charasay/blob/main/src/bubbles.rs
@@ -334,10 +334,10 @@ fn derive_cow_str(
 
 //Effectively a main function in the sense it does all the heavy lifting.
 pub fn print_cowsay(cowsay: &str, bubble: SpeechBubble, msg: &str, cow_variant: &CowVariant) {
-    let nom_it = match cow_parser::<ContextError>.parse(cowsay) {
+    let nom_it = match cow_parser::<TreeError<&str>>.parse(cowsay) {
         Ok(val) => val,
         Err(e) => {
-            panic!("{}", e.to_string())
+            panic!("{:#?}", e)
         }
     };
     //Prevent multiple consecutive newlines from being printed.
