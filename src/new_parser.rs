@@ -3,7 +3,7 @@ use winnow::{
     Parser,
     ascii::{alphanumeric1, digit1, space0},
     combinator::{alt, delimited, opt, preceded, repeat, repeat_till},
-    error::{AddContext, ParserError, StrContext},
+    error::{AddContext, ContextError, ParserError, StrContext},
     token::{literal, take, take_until},
 };
 
@@ -207,11 +207,11 @@ fn binding_value<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrCont
                     TerminalCharacter::UnicodeCharacter(c.chars().into_iter().next().unwrap())
                 }),
             )),
-            (literal("\";"), opt(alt((literal("\n"), literal("\r\n"))))),
+            literal("\";"),
         ),
         (literal("\";"), opt(alt((literal("\n"), literal("\r\n"))))),
     )
-    .map(|(_, (binding_val, _)): (_, (Vec<TerminalCharacter>, _))| binding_val)
+    .map(|(binding_val, _): (Vec<TerminalCharacter>, _)| binding_val)
     .parse_next(input)
 }
 
@@ -267,13 +267,13 @@ fn cow_string<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext
         )),
     );
 
-    delimited(
+    preceded(
         start,
         repeat_till(
             1..,
             alt((
-                placeholders,
                 spaces_and_lines,
+                placeholders,
                 escaped_char,
                 misc_escapes,
                 colors_256,
@@ -291,13 +291,13 @@ fn cow_string<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext
                 literal::<Stream<'a>, Stream<'a>, E>("\"@\n"),
             )),
         ),
-        alt((
-            literal::<Stream<'a>, Stream<'a>, E>("EOC\r\n"),
-            literal::<Stream<'a>, Stream<'a>, E>("EOC\n"),
-            literal::<Stream<'a>, Stream<'a>, E>("\"@\r\n"),
-            literal::<Stream<'a>, Stream<'a>, E>("\"@\n"),
-        ))
-        .context(StrContext::Label("cowstring_end")),
+        // alt((
+        //     literal::<Stream<'a>, Stream<'a>, E>("EOC\r\n"),
+        //     literal::<Stream<'a>, Stream<'a>, E>("EOC\n"),
+        //     literal::<Stream<'a>, Stream<'a>, E>("\"@\r\n"),
+        //     literal::<Stream<'a>, Stream<'a>, E>("\"@\n"),
+        // ))
+        // .context(StrContext::Label("cowstring_end")),
     )
     .map(|(mut chars, _): (Vec<TerminalCharacter>, _)| {
         chars.push(TerminalCharacter::CowStart);
@@ -316,6 +316,33 @@ pub fn cow_parser<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrCon
         cow_string,
         var_binding.map(|binding| vec![binding]),
     ))
-    .parse(input)
-    // .parse_next(input)
+    // .parse(input)
+    .parse_next(input)
+}
+
+pub struct ParserIterator<'i> {
+    stream: Stream<'i>,
+    // cow_started: bool,
+    // prev_new_line: bool,
+}
+
+impl<'i> ParserIterator<'i> {
+    pub fn new(input: &mut Stream<'i>) -> Self {
+        Self {
+            stream: &input,
+            // cow_started: false,
+            // prev_new_line: false,
+        }
+    }
+}
+
+impl<'i> Iterator for ParserIterator<'i> {
+    type Item = Vec<TerminalCharacter>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match cow_parser::<ContextError>.parse_next(&mut self.stream) {
+            Ok(parsed) => Some(parsed),
+            Err(_parse_err) => None, //NOTE this is probably flawed
+        }
+    }
 }
