@@ -2,9 +2,9 @@
 use winnow::{
     Parser,
     ascii::{alphanumeric1, digit1, space0},
-    combinator::{alt, delimited, fail, not, opt, preceded, repeat, repeat_till},
+    combinator::{alt, delimited, opt, preceded, repeat, repeat_till},
     error::{AddContext, ParserError, StrContext},
-    token::{literal, take, take_until, take_while},
+    token::{literal, take, take_until},
 };
 
 type WResult<O, E> = winnow::Result<O, E>;
@@ -163,36 +163,11 @@ fn comments<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext>>
 fn perl_junk<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext>>(
     input: &mut Stream<'a>,
 ) -> WResult<TerminalCharacter, E> {
-    // alt((
     alt((
-        // literal("EOC\n"),
-        // literal("EOC\r\n"),
-        // literal("\"@\n"),
-        // literal("\"@\r\n"),
         literal("binmode STDOUT, \":utf8\";\n"),
         literal("binmode STDOUT, \":utf8\";\r\n"),
     ))
     .map(|_| TerminalCharacter::Comment)
-    // map(
-    //     alt((
-    //         literal("$the_cow = @\"\n"),
-    //         literal("$the_cow = @\"\r\n"),
-    //         literal("$the_cow =<<EOC;\n"),
-    //         literal("$the_cow =<<EOC;\r\n"),
-    //         literal("$the_cow = <<\"EOC\";\n"),
-    //         literal("$the_cow = <<\"EOC\";\r\n"),
-    //         literal("$the_cow = <<EOC;\n"),
-    //         literal("$the_cow = <<EOC;\r\n"),
-    //         literal("$the_cow = << EOC;\n"),
-    //         literal("$the_cow = << EOC;\r\n"),
-    //         literal("$the_cow = << EOC\n"),
-    //         literal("$the_cow = << EOC\r\n"),
-    //         literal("$the_cow = <<EOC\n"),
-    //         literal("$the_cow = <<EOC\r\n"),
-    //     )),
-    //     |_| TerminalCharacter::CowStart,
-    // ),
-    // ))
     .parse_next(input)
 }
 
@@ -207,24 +182,6 @@ fn placeholders<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrConte
     .parse_next(input)
 }
 
-// fn cow_string_tokens<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext>>(
-//     input: &mut Stream<'a>,
-// ) -> WResult<TerminalCharacter, E> {
-//     alt((
-//         placeholders,
-//         spaces_and_lines,
-//         escaped_char,
-//         misc_escapes,
-//         colors_256,
-//         truecolor,
-//         unicode_char,
-//         take(1 as usize).map(|c: &str| {
-//             TerminalCharacter::UnicodeCharacter(c.chars().into_iter().next().unwrap())
-//         }),
-//     ))
-//     .parse_next(input)
-// }
-
 fn binding_name<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext>>(
     input: &mut Stream<'a>,
 ) -> WResult<&'a str, E> {
@@ -236,7 +193,7 @@ fn binding_value<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrCont
 ) -> WResult<Vec<TerminalCharacter>, E> {
     delimited(
         literal("\""),
-        repeat(
+        repeat_till(
             0..,
             alt((
                 placeholders,
@@ -250,10 +207,11 @@ fn binding_value<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrCont
                     TerminalCharacter::UnicodeCharacter(c.chars().into_iter().next().unwrap())
                 }),
             )),
+            (literal("\";"), opt(alt((literal("\n"), literal("\r\n"))))),
         ),
         (literal("\";"), opt(alt((literal("\n"), literal("\r\n"))))),
     )
-    .map(|binding_val| binding_val)
+    .map(|(_, (binding_val, _)): (_, (Vec<TerminalCharacter>, _))| binding_val)
     .parse_next(input)
 }
 
@@ -287,35 +245,34 @@ fn cow_string<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext
 ) -> WResult<Vec<TerminalCharacter>, E> {
     //NOTE this makes a flawed assumption where the perl delimiters don't have to match. But FWIW
     //it is not a significant bug honestly, most of these scripts _should_ be functional in OG perl
-    // let start = (
-    //     literal("$the_cow"),
-    //     space0,
-    //     literal("="),
-    //     space0,
-    //     literal("<<"),
-    //     space0,
-    //     //NOTE This is easier than trying to form a bunch of sub parsers honestly
-    //     alt((
-    //         literal("\"EOC\"\r\n"),
-    //         literal("\"EOC\"\n"),
-    //         literal("\"EOC\";\r\n"),
-    //         literal("\"EOC\";\n"),
-    //         literal("EOC\r\n"),
-    //         literal("EOC\n"),
-    //         literal("EOC;\r\n"),
-    //         literal("EOC;\n"),
-    //         literal("@\"\r\n"),
-    //         literal("@\"\n"),
-    //         fail.context(StrContext::Label("start")),
-    //     )),
-    // );
+    let start = (
+        literal("$the_cow"),
+        space0,
+        literal("="),
+        space0,
+        literal("<<"),
+        space0,
+        //NOTE This is easier than trying to form a bunch of sub parsers honestly
+        alt((
+            literal("\"EOC\"\r\n"),
+            literal("\"EOC\"\n"),
+            literal("\"EOC\";\r\n"),
+            literal("\"EOC\";\n"),
+            literal("EOC\r\n"),
+            literal("EOC\n"),
+            literal("EOC;\r\n"),
+            literal("EOC;\n"),
+            literal("@\"\r\n"),
+            literal("@\"\n"),
+        )),
+    );
 
     delimited(
-        delimited(literal("$the_cow"), take_until(1.., "\n"), literal("\n")),
+        start,
         repeat_till(
             1..,
             alt((
-                placeholders.context(StrContext::Label("cowstring_placeholders")),
+                placeholders,
                 spaces_and_lines,
                 escaped_char,
                 misc_escapes,
@@ -326,8 +283,7 @@ fn cow_string<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext
                 take(1 as usize).map(|c: &str| {
                     TerminalCharacter::UnicodeCharacter(c.chars().into_iter().next().unwrap())
                 }),
-            ))
-            .context(StrContext::Label("cowstring_body")),
+            )),
             alt((
                 literal::<Stream<'a>, Stream<'a>, E>("EOC\r\n"),
                 literal::<Stream<'a>, Stream<'a>, E>("EOC\n"),
@@ -336,8 +292,8 @@ fn cow_string<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext
             )),
         ),
         alt((
-            literal::<Stream<'a>, Stream<'a>, E>("EOC\\r\\n"),
-            literal::<Stream<'a>, Stream<'a>, E>("EOC\\n"),
+            literal::<Stream<'a>, Stream<'a>, E>("EOC\r\n"),
+            literal::<Stream<'a>, Stream<'a>, E>("EOC\n"),
             literal::<Stream<'a>, Stream<'a>, E>("\"@\r\n"),
             literal::<Stream<'a>, Stream<'a>, E>("\"@\n"),
         ))
@@ -360,5 +316,6 @@ pub fn cow_parser<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrCon
         cow_string,
         var_binding.map(|binding| vec![binding]),
     ))
-    .parse_next(input)
+    .parse(input)
+    // .parse_next(input)
 }
