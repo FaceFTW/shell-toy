@@ -1,4 +1,4 @@
-use crate::new_parser::{ParserIterator, TerminalCharacter};
+use crate::parser::{ParserIterator, TerminalCharacter};
 use owo_colors::{DynColor, OwoColorize, Style, XtermColors};
 use std::{collections::HashMap, error::Error, str::from_utf8};
 #[cfg(not(feature = "inline-cowsay"))]

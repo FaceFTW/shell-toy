@@ -14,7 +14,6 @@ path = "src/main.rs"
 
 [dependencies]
 owo-colors = "4"
-# nom = "8"
 winnow = "0.7"
 tinyrand = "0.5"
 getrandom = "0.3"
@@ -48,6 +47,7 @@ inline-cowsay = []
 lite = []
 standard = ["inline-fortune", "inline-cowsay"]
 max = ["inline-fortune", "inline-off-fortune", "inline-cowsay"]
+debug = ["winnow/debug"]
 
 [profile.release]
 codegen-units = 1

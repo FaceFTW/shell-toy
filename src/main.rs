@@ -1,15 +1,13 @@
 mod cli;
 mod cowsay;
 mod fortune;
-// mod parser;
-mod new_parser;
+mod parser;
 
 use cli::Options;
 use cowsay::{
     CowVariant, SpeechBubble, get_cow_names, get_cow_string, print_cowsay, random_cow_variant,
 };
 
-// use parser::cow_parser;
 use tinyrand::{Seeded, StdRand};
 
 fn main() {
@@ -52,31 +50,6 @@ fn main() {
             CowVariant::Random => random_cow_variant(&mut rng),
             _ => options.cow_variant,
         };
-
-        //Useful little snippet for debugging cowfiles. Commented out usually
-        // if options.enable_debug {
-        //     let mut remaining: &str = &cow_str.as_str();
-        //     loop {
-        //         if remaining.is_empty() {
-        //             break;
-        //         }
-        //         match cow_parser(remaining) {
-        //             Ok((input, output)) => {
-        //                 remaining = input;
-        //                 dbg!((input, output));
-        //             }
-        //             Err(e) => {
-        //                 dbg!(e);
-        //                 break;
-        //             }
-        //         }
-        //     }
-
-            // let mut nom_it = nom::combinator::iterator(cow_str.as_str(), parser::cow_parser);
-            // while let some = nom_it.next() {
-            // nom_it.
-            // }
-        // }
 
         print_cowsay(
             &cow_str,
