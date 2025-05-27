@@ -1,3 +1,5 @@
+///Imaging writing an entire parser for a Perl-like language just for a tiny little tool
+/// couldn't be me hahahahahahaha
 use winnow::{
     Parser,
     ascii::{alphanumeric1, digit1, space0},
