@@ -1,8 +1,10 @@
+use std::{iter::Filter, slice::Iter};
+
 // use crate::parser::TerminalCharacter;
 use winnow::{
     Parser,
     ascii::{alphanumeric1, digit1, space0},
-    combinator::{alt, delimited, opt, preceded, repeat, repeat_till},
+    combinator::{alt, delimited, opt, preceded, repeat_till},
     error::{AddContext, ContextError, ParserError, StrContext},
     token::{literal, take, take_until},
 };
@@ -300,7 +302,7 @@ fn cow_string<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext
         // .context(StrContext::Label("cowstring_end")),
     )
     .map(|(mut chars, _): (Vec<TerminalCharacter>, _)| {
-        chars.push(TerminalCharacter::CowStart);
+        chars.insert(0usize, TerminalCharacter::CowStart);
         chars
     })
     .parse_next(input)
@@ -322,27 +324,81 @@ pub fn cow_parser<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrCon
 
 pub struct ParserIterator<'i> {
     stream: Stream<'i>,
-    // cow_started: bool,
-    // prev_new_line: bool,
+    cow_started: bool,
+    prev_new_line: bool,
+    //NOTE Technically, better is to use generics, but we know what the internal iterator is
+    //composed of, so generic impl doesn't make too much sense
+    parsed_iter: Option<std::vec::IntoIter<TerminalCharacter>>,
 }
 
+///Based on the [std::iter::Flatten] implementation s
 impl<'i> ParserIterator<'i> {
     pub fn new(input: &mut Stream<'i>) -> Self {
         Self {
             stream: &input,
-            // cow_started: false,
-            // prev_new_line: false,
+            cow_started: false,
+            prev_new_line: false,
+            parsed_iter: None,
         }
     }
 }
 
 impl<'i> Iterator for ParserIterator<'i> {
-    type Item = Vec<TerminalCharacter>;
+    type Item = TerminalCharacter;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match cow_parser::<ContextError>.parse_next(&mut self.stream) {
-            Ok(parsed) => Some(parsed),
-            Err(_parse_err) => None, //NOTE this is probably flawed
+        match self.parsed_iter {
+            Some(ref mut iter) => match (iter).next() {
+                Some(val) => Some(val),
+                None => {
+                    self.parsed_iter = None;
+                    self.next() //NOTE this is obviously recursive. Should be a way to "fuse" iter here (effectively)
+                }
+            },
+            None => {
+                match cow_parser::<ContextError>.parse_next(&mut self.stream) {
+                    Ok(parsed) => {
+                        let iter = parsed.into_iter().filter(|parsed| match parsed {
+                            TerminalCharacter::Newline => {
+                                if self.prev_new_line {
+                                    false
+                                } else {
+                                    self.prev_new_line = self.cow_started;
+                                    true
+                                }
+                            }
+                            TerminalCharacter::Comment => true, //Should not alter newline state since it's not interpreted
+                            TerminalCharacter::CowStart => {
+                                self.cow_started = true;
+                                true
+                            }
+                            _ => {
+                                self.prev_new_line = false;
+                                true
+                            }
+                        });
+
+                        //HACK This is _really_ bad code
+                        //Basically since I can't really constrain the generic type of the filter predicate generic type
+                        // since closures can't be calculated that way and _this_ closure requires messing with this
+                        // iterator's internal state, I'm going to allocate a collected vector, then use _that vector's_
+                        // iterator as the reference iterator.
+                        //I can't think of a workaround. If you have a better solution, send patches and stop complaining
+                        // because I hate it too.
+                        let filtered: Vec<TerminalCharacter> = iter.collect();
+
+                        self.parsed_iter = Some(filtered.into_iter());
+
+                        self.next()
+                    }
+                    Err(_parse_err) => None, //NOTE this is probably flawed
+                }
+            }
         }
     }
+
+    // match cow_parser::<ContextError>.parse_next(&mut self.stream) {
+    //     Ok(parsed) => Some(parsed),
+    //     Err(_parse_err) => None, //NOTE this is probably flawed
+    // }
 }

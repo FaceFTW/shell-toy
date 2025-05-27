@@ -275,6 +275,7 @@ fn derive_cow_str(
     let mut cow_string = String::new();
 
     for term_char in parsed_chars {
+        dbg!(term_char);
         match term_char {
             TerminalCharacter::Space => {
                 cow_string = cow_string + format!("{}", " ".style(current_style.inner)).as_str()
@@ -340,37 +341,38 @@ pub fn print_cowsay(mut cowsay: &str, bubble: SpeechBubble, msg: &str, cow_varia
     let parser_it = ParserIterator::new(&mut cowsay);
     //Prevent multiple consecutive newlines from being printed.
     //state.0 = is cow started, state.1 is if we encountered newline previously
-    let scan_it =
-        parser_it
-            .flatten()
-            .into_iter()
-            .scan((false, false), |state, parsed| match parsed {
-                TerminalCharacter::Newline => {
-                    if state.1 {
-                        None
-                    } else {
-                        *state = (state.0, state.0); //Only true if cow started
-                        Some(parsed)
-                    }
-                }
-                TerminalCharacter::Comment => {
-                    *state = *state;
-                    Some(parsed)
-                } //Should not alter newline state since it's not interpreted
-                TerminalCharacter::CowStart => {
-                    *state = (true, state.1);
-                    Some(parsed)
-                }
-                _ => {
-                    *state = (state.0, false);
-                    Some(parsed)
-                }
-            });
+    // let scan_it =
+    //     parser_it
+    //         .flatten()
+    //         .into_iter()
+    //         .scan((false, false), |state, parsed| match parsed {
+    //             TerminalCharacter::Newline => {
+    //                 if state.1 {
+    //                     None
+    //                 } else {
+    //                     *state = (state.0, state.0); //Only true if cow started
+    //                     Some(parsed)
+    //                 }
+    //             }
+    //             TerminalCharacter::Comment => {
+    //                 *state = *state;
+    //                 Some(parsed)
+    //             } //Should not alter newline state since it's not interpreted
+    //             TerminalCharacter::CowStart => {
+    //                 *state = (true, state.1);
+    //                 Some(parsed)
+    //             }
+    //             _ => {
+    //                 *state = (state.0, false);
+    //                 Some(parsed)
+    //             }
+    //         });
     //Because colors will change before characters are created, we take an owo_colors style
     // and use it as the "current style under tracking". As we created the string, we apply the style necessary to each character
     let mut style_buffer = StyleBuffer::new();
     let cow_str = derive_cow_str(
-        scan_it.collect::<Vec<TerminalCharacter>>().as_slice(),
+        parser_it.collect::<Vec<TerminalCharacter>>().as_slice(),
+        // scan_it.collect::<Vec<TerminalCharacter>>().as_slice(),
         &mut style_buffer,
         cow_variant,
     );
