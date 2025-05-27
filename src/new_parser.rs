@@ -1,6 +1,3 @@
-use std::{iter::Filter, slice::Iter};
-
-// use crate::parser::TerminalCharacter;
 use winnow::{
     Parser,
     ascii::{alphanumeric1, digit1, space0},
@@ -66,16 +63,10 @@ fn colors_256<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext
 ) -> WResult<TerminalCharacter, E> {
     delimited(
         literal("\\e["),
-        (
-            alt((literal("38"), literal("48"))),
-            literal(";"),
-            literal("5"),
-            literal(";"),
-            digit1,
-        ),
+        (alt((literal("38"), literal("48"))), literal(";5;"), digit1),
         literal("m"),
     )
-    .map(|(color_type, _, _, _, color)| match color_type {
+    .map(|(color_type, _, color)| match color_type {
         "38" => TerminalCharacter::TerminalForegroundColor256(str::parse(color).unwrap()),
         "48" => TerminalCharacter::TerminalBackgroundColor256(str::parse(color).unwrap()),
         _ => panic!(), //TODO change this to some kind of error handling
@@ -90,9 +81,7 @@ fn truecolor<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext>
         literal("\\e["),
         (
             alt((literal("38"), literal("48"))),
-            literal(";"),
-            literal("2"),
-            literal(";"),
+            literal(";2;"),
             digit1,
             literal(";"),
             digit1,
@@ -101,7 +90,7 @@ fn truecolor<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext>
         ),
         literal("m"),
     )
-    .map(|(color_type, _, _, _, red, _, green, _, blue)| {
+    .map(|(color_type, _, red, _, green, _, blue)| {
         match color_type {
             "38" => TerminalCharacter::TerminalForegroundColorTruecolor(
                 str::parse(red).unwrap(),
@@ -200,11 +189,11 @@ fn binding_value<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrCont
             alt((
                 placeholders,
                 spaces_and_lines,
-                escaped_char,
                 misc_escapes,
                 colors_256,
                 truecolor,
                 unicode_char,
+                escaped_char,
                 take(1 as usize).map(|c: &str| {
                     TerminalCharacter::UnicodeCharacter(c.chars().into_iter().next().unwrap())
                 }),
@@ -276,11 +265,11 @@ fn cow_string<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext
             alt((
                 spaces_and_lines,
                 placeholders,
-                escaped_char,
                 misc_escapes,
                 colors_256,
                 truecolor,
                 unicode_char,
+                escaped_char,
                 bound_var_call,
                 take(1 as usize).map(|c: &str| {
                     TerminalCharacter::UnicodeCharacter(c.chars().into_iter().next().unwrap())
@@ -293,13 +282,6 @@ fn cow_string<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext
                 literal::<Stream<'a>, Stream<'a>, E>("\"@\n"),
             )),
         ),
-        // alt((
-        //     literal::<Stream<'a>, Stream<'a>, E>("EOC\r\n"),
-        //     literal::<Stream<'a>, Stream<'a>, E>("EOC\n"),
-        //     literal::<Stream<'a>, Stream<'a>, E>("\"@\r\n"),
-        //     literal::<Stream<'a>, Stream<'a>, E>("\"@\n"),
-        // ))
-        // .context(StrContext::Label("cowstring_end")),
     )
     .map(|(mut chars, _): (Vec<TerminalCharacter>, _)| {
         chars.insert(0usize, TerminalCharacter::CowStart);
@@ -391,14 +373,9 @@ impl<'i> Iterator for ParserIterator<'i> {
 
                         self.next()
                     }
-                    Err(_parse_err) => None, //NOTE this is probably flawed
+                    Err(_parse_err) => None,
                 }
             }
         }
     }
-
-    // match cow_parser::<ContextError>.parse_next(&mut self.stream) {
-    //     Ok(parsed) => Some(parsed),
-    //     Err(_parse_err) => None, //NOTE this is probably flawed
-    // }
 }
