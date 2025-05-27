@@ -3,7 +3,7 @@
 use winnow::{
     Parser,
     ascii::{alphanumeric1, digit1, space0},
-    combinator::{alt, delimited, opt, preceded, repeat_till},
+    combinator::{alt, delimited, fail, opt, preceded, repeat_till, terminated},
     error::{AddContext, ContextError, ParserError, StrContext},
     token::{literal, take, take_until},
 };
@@ -44,69 +44,40 @@ fn spaces_and_lines<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrC
     .parse_next(input)
 }
 
-fn misc_escapes<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext>>(
+fn term_color<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext>>(
     input: &mut Stream<'a>,
 ) -> WResult<TerminalCharacter, E> {
-    delimited(
-        literal("\\e["),
-        alt((literal("39"), literal("49"))),
-        literal("m"),
-    )
-    .map(|esc: &str| match esc {
-        "39" => TerminalCharacter::DefaultForegroundColor,
-        "49" => TerminalCharacter::DefaultBackgroundColor,
-        _ => panic!(), //TODO Change this to some error handling
-    })
-    .parse_next(input)
-}
-
-fn colors_256<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext>>(
-    input: &mut Stream<'a>,
-) -> WResult<TerminalCharacter, E> {
-    delimited(
-        literal("\\e["),
-        (alt((literal("38"), literal("48"))), literal(";5;"), digit1),
-        literal("m"),
-    )
-    .map(|(color_type, _, color)| match color_type {
-        "38" => TerminalCharacter::TerminalForegroundColor256(str::parse(color).unwrap()),
-        "48" => TerminalCharacter::TerminalBackgroundColor256(str::parse(color).unwrap()),
-        _ => panic!(), //TODO change this to some kind of error handling
-    })
-    .parse_next(input)
-}
-
-fn truecolor<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext>>(
-    input: &mut Stream<'a>,
-) -> WResult<TerminalCharacter, E> {
-    delimited(
-        literal("\\e["),
-        (
-            alt((literal("38"), literal("48"))),
-            literal(";2;"),
-            digit1,
-            literal(";"),
-            digit1,
-            literal(";"),
-            digit1,
-        ),
-        literal("m"),
-    )
-    .map(|(color_type, _, red, _, green, _, blue)| {
-        match color_type {
-            "38" => TerminalCharacter::TerminalForegroundColorTruecolor(
+    let mut fg_color = winnow::dispatch! {delimited(literal(";"), take(1usize), literal(";"));
+        "5" => terminated(digit1, literal("m")).map(|num|TerminalCharacter::TerminalForegroundColor256(str::parse(num).unwrap())),
+        "2" => terminated((digit1 ,literal(";"), digit1, literal(";"), digit1), literal("m")).map(|(red, _ , green, _, blue)|{
+             TerminalCharacter::TerminalForegroundColorTruecolor(
                 str::parse(red).unwrap(),
                 str::parse(green).unwrap(),
                 str::parse(blue).unwrap(),
-            ),
-            "48" => TerminalCharacter::TerminalBackgroundColorTruecolor(
+            )
+        }),
+        _ => fail
+    };
+
+    let mut bg_color = winnow::dispatch! {delimited(literal(";"), take(1usize), literal(";"));
+        "5" => terminated(digit1, literal("m")).map(|num|TerminalCharacter::TerminalBackgroundColor256(str::parse(num).unwrap())),
+        "2" => terminated((digit1 ,literal(";"), digit1, literal(";"), digit1), literal("m")).map(|(red, _ , green, _, blue)|{
+             TerminalCharacter::TerminalBackgroundColorTruecolor(
                 str::parse(red).unwrap(),
                 str::parse(green).unwrap(),
                 str::parse(blue).unwrap(),
-            ),
-            _ => panic!(), //TODO change this to some kind of error handling
-        }
-    })
+            )
+        }),
+        _ => fail
+    };
+
+    winnow::dispatch! {preceded(literal("\\e["), take(2usize));
+        "39" => literal("m").map(|_| TerminalCharacter::DefaultForegroundColor),
+        "49" => literal("m").map(|_| TerminalCharacter::DefaultBackgroundColor),
+        "38" => fg_color,
+        "48" => bg_color,
+        _ => fail
+    }
     .parse_next(input)
 }
 
@@ -191,9 +162,7 @@ fn binding_value<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrCont
             alt((
                 placeholders,
                 spaces_and_lines,
-                misc_escapes,
-                colors_256,
-                truecolor,
+                term_color,
                 unicode_char,
                 escaped_char,
                 take(1 as usize).map(|c: &str| {
@@ -267,9 +236,7 @@ fn cow_string<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext
             alt((
                 spaces_and_lines,
                 placeholders,
-                misc_escapes,
-                colors_256,
-                truecolor,
+                term_color,
                 unicode_char,
                 escaped_char,
                 bound_var_call,
@@ -292,7 +259,7 @@ fn cow_string<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext
     .parse_next(input)
 }
 
-pub fn cow_parser<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext>>(
+fn cow_parser<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext>>(
     input: &mut Stream<'a>,
 ) -> WResult<Vec<TerminalCharacter>, E> {
     alt((
@@ -302,7 +269,6 @@ pub fn cow_parser<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrCon
         cow_string,
         var_binding.map(|binding| vec![binding]),
     ))
-    // .parse(input)
     .parse_next(input)
 }
 
