@@ -3,13 +3,13 @@
 use winnow::{
     Parser,
     ascii::{alphanumeric1, digit1, space0},
-    combinator::{alt, delimited, fail, opt, preceded, repeat_till, terminated},
+    combinator::{alt, delimited, fail, preceded, repeat_till, terminated},
     error::{AddContext, ContextError, ParserError, StrContext},
     token::{literal, take, take_until},
 };
 
-type WResult<O, E> = winnow::Result<O, E>;
-type Stream<'i> = &'i str;
+type ParserResult<O, E> = winnow::Result<O, E>;
+type InputStream<'i> = &'i str;
 
 //For lack of a better name
 #[derive(Debug, PartialEq, Clone)]
@@ -33,9 +33,12 @@ pub enum TerminalCharacter {
     CowStart,
 }
 
-fn spaces_and_lines<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext>>(
-    input: &mut Stream<'a>,
-) -> WResult<TerminalCharacter, E> {
+fn spaces_and_lines<
+    'a,
+    E: ParserError<InputStream<'a>> + AddContext<InputStream<'a>, StrContext>,
+>(
+    input: &mut InputStream<'a>,
+) -> ParserResult<TerminalCharacter, E> {
     alt((
         literal("\r\n").map(|_| TerminalCharacter::Newline),
         literal("\n").map(|_| TerminalCharacter::Newline),
@@ -44,9 +47,9 @@ fn spaces_and_lines<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrC
     .parse_next(input)
 }
 
-fn term_color<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext>>(
-    input: &mut Stream<'a>,
-) -> WResult<TerminalCharacter, E> {
+fn term_color<'a, E: ParserError<InputStream<'a>> + AddContext<InputStream<'a>, StrContext>>(
+    input: &mut InputStream<'a>,
+) -> ParserResult<TerminalCharacter, E> {
     let mut fg_color = winnow::dispatch! {delimited(literal(";"), take(1usize), literal(";"));
         "5" => terminated(digit1, literal("m")).map(|num|TerminalCharacter::TerminalForegroundColor256(str::parse(num).unwrap())),
         "2" => terminated((digit1 ,literal(";"), digit1, literal(";"), digit1), literal("m")).map(|(red, _ , green, _, blue)|{
@@ -81,9 +84,9 @@ fn term_color<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext
     .parse_next(input)
 }
 
-fn unicode_char<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext>>(
-    input: &mut Stream<'a>,
-) -> WResult<TerminalCharacter, E> {
+fn unicode_char<'a, E: ParserError<InputStream<'a>> + AddContext<InputStream<'a>, StrContext>>(
+    input: &mut InputStream<'a>,
+) -> ParserResult<TerminalCharacter, E> {
     //Turns out, there are different ways to parse unicode escapes.
     //This is my best attempt at covering them
     alt((
@@ -104,9 +107,9 @@ fn unicode_char<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrConte
 }
 
 //Fallback for a character that has an explicit escape
-fn escaped_char<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext>>(
-    input: &mut Stream<'a>,
-) -> WResult<TerminalCharacter, E> {
+fn escaped_char<'a, E: ParserError<InputStream<'a>> + AddContext<InputStream<'a>, StrContext>>(
+    input: &mut InputStream<'a>,
+) -> ParserResult<TerminalCharacter, E> {
     preceded(literal("\\"), take(1usize))
         .map(|character: &str| {
             TerminalCharacter::EscapedUnicodeCharacter(character.chars().next().unwrap())
@@ -114,9 +117,9 @@ fn escaped_char<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrConte
         .parse_next(input)
 }
 
-fn comments<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext>>(
-    input: &mut Stream<'a>,
-) -> WResult<TerminalCharacter, E> {
+fn comments<'a, E: ParserError<InputStream<'a>> + AddContext<InputStream<'a>, StrContext>>(
+    input: &mut InputStream<'a>,
+) -> ParserResult<TerminalCharacter, E> {
     delimited(literal("#"), take_until(1.., "\n"), literal("\n"))
         .map(|_| TerminalCharacter::Comment)
         .parse_next(input)
@@ -124,9 +127,9 @@ fn comments<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext>>
 
 ///This parser is for random perl junk we see in files that we want to ignore since we aren't really a perl interpreter
 /// Some of it *is* useful when it comes to acting as a "barrier" between actual text we want to parse
-fn perl_junk<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext>>(
-    input: &mut Stream<'a>,
-) -> WResult<TerminalCharacter, E> {
+fn perl_junk<'a, E: ParserError<InputStream<'a>> + AddContext<InputStream<'a>, StrContext>>(
+    input: &mut InputStream<'a>,
+) -> ParserResult<TerminalCharacter, E> {
     alt((
         literal("binmode STDOUT, \":utf8\";\n"),
         literal("binmode STDOUT, \":utf8\";\r\n"),
@@ -135,9 +138,9 @@ fn perl_junk<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext>
     .parse_next(input)
 }
 
-fn placeholders<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext>>(
-    input: &mut Stream<'a>,
-) -> WResult<TerminalCharacter, E> {
+fn placeholders<'a, E: ParserError<InputStream<'a>> + AddContext<InputStream<'a>, StrContext>>(
+    input: &mut InputStream<'a>,
+) -> ParserResult<TerminalCharacter, E> {
     alt((
         literal("$thoughts").map(|_| TerminalCharacter::ThoughtPlaceholder),
         literal("$eyes").map(|_| TerminalCharacter::EyePlaceholder),
@@ -146,16 +149,16 @@ fn placeholders<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrConte
     .parse_next(input)
 }
 
-fn binding_name<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext>>(
-    input: &mut Stream<'a>,
-) -> WResult<&'a str, E> {
+fn binding_name<'a, E: ParserError<InputStream<'a>> + AddContext<InputStream<'a>, StrContext>>(
+    input: &mut InputStream<'a>,
+) -> ParserResult<&'a str, E> {
     preceded(literal("$"), alphanumeric1).parse_next(input)
 }
 
-fn binding_value<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext>>(
-    input: &mut Stream<'a>,
-) -> WResult<Vec<TerminalCharacter>, E> {
-    delimited(
+fn binding_value<'a, E: ParserError<InputStream<'a>> + AddContext<InputStream<'a>, StrContext>>(
+    input: &mut InputStream<'a>,
+) -> ParserResult<Vec<TerminalCharacter>, E> {
+    preceded(
         literal("\""),
         repeat_till(
             0..,
@@ -171,15 +174,14 @@ fn binding_value<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrCont
             )),
             literal("\";"),
         ),
-        (literal("\";"), opt(alt((literal("\n"), literal("\r\n"))))),
     )
     .map(|(binding_val, _): (Vec<TerminalCharacter>, _)| binding_val)
     .parse_next(input)
 }
 
-fn var_binding<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext>>(
-    input: &mut Stream<'a>,
-) -> WResult<TerminalCharacter, E> {
+fn var_binding<'a, E: ParserError<InputStream<'a>> + AddContext<InputStream<'a>, StrContext>>(
+    input: &mut InputStream<'a>,
+) -> ParserResult<TerminalCharacter, E> {
     //some assumptions of format we will be making here because perl has no BNF
     //1. Vars start with $, and are alphanumeric characters (at least one)
     //2. equals sign padded by any number of spaces on each side
@@ -194,38 +196,41 @@ fn var_binding<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContex
         .parse_next(input)
 }
 
-fn bound_var_call<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext>>(
-    input: &mut Stream<'a>,
-) -> WResult<TerminalCharacter, E> {
+fn bound_var_call<'a, E: ParserError<InputStream<'a>> + AddContext<InputStream<'a>, StrContext>>(
+    input: &mut InputStream<'a>,
+) -> ParserResult<TerminalCharacter, E> {
     preceded(literal("$"), alphanumeric1)
         .map(|name: &'a str| TerminalCharacter::BoundVarCall(name.to_string()))
         .parse_next(input)
 }
 
-fn cow_string<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext>>(
-    input: &mut Stream<'a>,
-) -> WResult<Vec<TerminalCharacter>, E> {
+fn cow_string<'a, E: ParserError<InputStream<'a>> + AddContext<InputStream<'a>, StrContext>>(
+    input: &mut InputStream<'a>,
+) -> ParserResult<Vec<TerminalCharacter>, E> {
     //NOTE this makes a flawed assumption where the perl delimiters don't have to match. But FWIW
-    //it is not a significant bug honestly, most of these scripts _should_ be functional in OG perl
+    //it is not a significant bug honestly, most of these scripts _should_ have been proper in the OG perl
     let start = (
         literal("$the_cow"),
         space0,
         literal("="),
         space0,
-        literal("<<"),
-        space0,
-        //NOTE This is easier than trying to form a bunch of sub parsers honestly
         alt((
-            literal("\"EOC\"\r\n"),
-            literal("\"EOC\"\n"),
-            literal("\"EOC\";\r\n"),
-            literal("\"EOC\";\n"),
-            literal("EOC\r\n"),
-            literal("EOC\n"),
-            literal("EOC;\r\n"),
-            literal("EOC;\n"),
-            literal("@\"\r\n"),
-            literal("@\"\n"),
+            alt((literal("@\"\r\n"), literal("@\"\n"))),
+            (
+                literal("<<"),
+                space0,
+                alt((
+                    literal("EOC\r\n"),
+                    literal("EOC\n"),
+                    literal("EOC;\r\n"),
+                    literal("EOC;\n"),
+                    literal("\"EOC\"\r\n"),
+                    literal("\"EOC\"\n"),
+                    literal("\"EOC\";\r\n"),
+                    literal("\"EOC\";\n"),
+                )),
+            )
+                .value(""),
         )),
     );
 
@@ -245,10 +250,10 @@ fn cow_string<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext
                 }),
             )),
             alt((
-                literal::<Stream<'a>, Stream<'a>, E>("EOC\r\n"),
-                literal::<Stream<'a>, Stream<'a>, E>("EOC\n"),
-                literal::<Stream<'a>, Stream<'a>, E>("\"@\r\n"),
-                literal::<Stream<'a>, Stream<'a>, E>("\"@\n"),
+                literal::<InputStream<'a>, InputStream<'a>, E>("EOC\r\n"),
+                literal::<InputStream<'a>, InputStream<'a>, E>("EOC\n"),
+                literal::<InputStream<'a>, InputStream<'a>, E>("\"@\r\n"),
+                literal::<InputStream<'a>, InputStream<'a>, E>("\"@\n"),
             )),
         ),
     )
@@ -259,9 +264,9 @@ fn cow_string<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext
     .parse_next(input)
 }
 
-fn cow_parser<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext>>(
-    input: &mut Stream<'a>,
-) -> WResult<Vec<TerminalCharacter>, E> {
+fn cow_parser<'a, E: ParserError<InputStream<'a>> + AddContext<InputStream<'a>, StrContext>>(
+    input: &mut InputStream<'a>,
+) -> ParserResult<Vec<TerminalCharacter>, E> {
     alt((
         comments.map(|comment| vec![comment]),
         spaces_and_lines.map(|whitespace| vec![whitespace]),
@@ -273,7 +278,7 @@ fn cow_parser<'a, E: ParserError<Stream<'a>> + AddContext<Stream<'a>, StrContext
 }
 
 pub struct ParserIterator<'i> {
-    stream: Stream<'i>,
+    stream: InputStream<'i>,
     cow_started: bool,
     prev_new_line: bool,
     //NOTE Technically, better is to use generics, but we know what the internal iterator is
@@ -281,9 +286,8 @@ pub struct ParserIterator<'i> {
     parsed_iter: Option<std::vec::IntoIter<TerminalCharacter>>,
 }
 
-///Based on the [std::iter::Flatten] implementation s
 impl<'i> ParserIterator<'i> {
-    pub fn new(input: &mut Stream<'i>) -> Self {
+    pub fn new(input: &mut InputStream<'i>) -> Self {
         Self {
             stream: &input,
             cow_started: false,
