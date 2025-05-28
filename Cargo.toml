@@ -1,6 +1,6 @@
 [package]
 name = "shell-toy"
-version = "0.6.3"
+version = "0.7.0"
 edition = "2024"
 description = "A \"fortune | cowsay\" implementation in Rust, i.e. a nice little toy to liven up your shell."
 license = "MIT"
@@ -14,7 +14,7 @@ path = "src/main.rs"
 
 [dependencies]
 owo-colors = "4"
-nom = "8"
+winnow = "0.7"
 tinyrand = "0.5"
 getrandom = "0.3"
 argh = "0.1"
@@ -29,7 +29,7 @@ quote = "1"
 cfg-if = "1"
 toml = "0.8"
 serde = { version = "1", features = ["derive"] }
-zip = { version = "2.2", features = [
+zip = { version = "4", features = [
 	"deflate",
 	"deflate64",
 	"lzma",
@@ -39,6 +39,9 @@ fs_extra = "1.3"
 
 
 [features]
+#For Easier debugging of the cowsay parser
+debug = ["winnow/debug"]
+
 default = []
 inline-fortune = []
 inline-off-fortune = []
