@@ -16,9 +16,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust Toolchain
-        run: rustup toolchain install 1.80.1
+        run: rustup toolchain install 1.85
       - name: "Set Rust Toolchain"
-        run: rustup default 1.80.1
+        run: rustup default 1.85
       - name: Add Compile Target
         run: rustup target add ${{ matrix.triple }}
       - name: Cargo Build
