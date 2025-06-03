@@ -1,6 +1,7 @@
 mod cli;
 mod cowsay;
 mod fortune;
+mod img;
 mod parser;
 
 use cli::Options;
@@ -25,6 +26,7 @@ fn main() {
         #[cfg(not(feature = "inline-cowsay"))]
         get_cow_names(&options.cow_path);
     } else {
+
         #[cfg(feature = "inline-cowsay")]
         let cow_str = get_cow_string(&options.cow_file, &mut rng);
         #[cfg(not(feature = "inline-cowsay"))]

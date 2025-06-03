@@ -19,6 +19,10 @@ pub(crate) struct Options {
     /// lists the cows that are embedded in the executable
     pub list_cows: bool,
 
+    #[argh(option, short = 'i', long = "image")]
+    ///uses an image as the "cow" file
+    pub image: Option<String>,
+
     #[argh(
         option,
         short = 'b',

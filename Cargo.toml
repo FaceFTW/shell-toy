@@ -23,6 +23,9 @@ strip-ansi-escapes = "0.2"
 unicode-width = "0.2"
 cfg-if = "1"
 
+rgb="0.8"
+png="0.17"
+
 [build-dependencies]
 proc-macro2 = "1"
 quote = "1"
