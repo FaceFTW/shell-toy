@@ -1,6 +1,6 @@
 [package]
 name = "shell-toy"
-version = "0.7.0"
+version = "0.7.1"
 edition = "2024"
 description = "A \"fortune | cowsay\" implementation in Rust, i.e. a nice little toy to liven up your shell."
 license = "MIT"
@@ -27,9 +27,9 @@ cfg-if = "1"
 proc-macro2 = "1"
 quote = "1"
 cfg-if = "1"
-toml = "0.8"
+toml = "0.9"
 serde = { version = "1", features = ["derive"] }
-zip = { version = "4", features = [
+zip = { version = "6", features = [
 	"deflate",
 	"deflate64",
 	"lzma",
