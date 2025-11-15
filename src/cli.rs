@@ -59,6 +59,10 @@ pub(crate) struct Options {
     /// whether to include offensive fortunes
     pub include_offensive: bool,
 
+    #[argh(option, short = 'w')]
+    /// limits the length of speech bubbles. Default is 64
+    pub max_width: Option<u64>,
+
     #[argh(positional)]
     pub message: Option<String>,
 }

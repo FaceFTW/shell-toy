@@ -51,11 +51,17 @@ fn main() {
             _ => options.cow_variant,
         };
 
+        let max_width = match options.max_width {
+            Some(val) => val as usize,
+            None => 64usize,
+        };
+
         print_cowsay(
             &cow_str,
             SpeechBubble::new(options.bubble_type),
             &cow_msg,
             &cow_variant,
+            max_width,
         );
     }
 }

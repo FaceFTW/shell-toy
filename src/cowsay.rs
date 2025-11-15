@@ -328,7 +328,13 @@ fn derive_cow_str(
 }
 
 //Effectively a main function in the sense it does all the heavy lifting.
-pub fn print_cowsay(mut cowsay: &str, bubble: SpeechBubble, msg: &str, cow_variant: &CowVariant) {
+pub fn print_cowsay(
+    mut cowsay: &str,
+    bubble: SpeechBubble,
+    msg: &str,
+    cow_variant: &CowVariant,
+    max_width: usize,
+) {
     let parser_it = ParserIterator::new(&mut cowsay);
 
     //Because colors will change before characters are created, we take an owo_colors style
@@ -341,7 +347,7 @@ pub fn print_cowsay(mut cowsay: &str, bubble: SpeechBubble, msg: &str, cow_varia
         cow_variant,
     );
     let msg_str = bubble
-        .create(msg, 64 as usize)
+        .create(msg, max_width)
         .expect("Could not create message bubble");
 
     println!("{msg_str}{cow_str}")
