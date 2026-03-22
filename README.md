@@ -7,9 +7,10 @@ A `fortune | cowsay` implementation in Rust.
 
 ## Installation
 
-Currently, pre-built binaries are not provided since the project is in a state I don't consider to be "finished".
+You can get pre-built binaries, including ones containing the default `cowsay` and `fortune` package resources embedded in the releases section. 
 
-For now the best way is to use Cargo:
+Via Cargo (this builds a barebones binary):
+MSRV: Rust 1.88
 ```
 cargo install shell-toy
 ```

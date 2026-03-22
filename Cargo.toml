@@ -1,11 +1,12 @@
 [package]
 name = "shell-toy"
-version = "0.7.1"
+version = "0.7.2"
 edition = "2024"
 description = "A \"fortune | cowsay\" implementation in Rust, i.e. a nice little toy to liven up your shell."
 license = "MIT"
 repository = "https://github.com/FaceFTW/shell-toy"
 keywords = ["terminal", "customization", "fortune", "cowsay", "fortune-cookie"]
+
 
 
 [[bin]]
@@ -14,7 +15,7 @@ path = "src/main.rs"
 
 [dependencies]
 owo-colors = "4"
-winnow = "0.7"
+winnow = "1.0"
 tinyrand = "0.5"
 getrandom = "0.3"
 argh = "0.1"
@@ -27,9 +28,9 @@ cfg-if = "1"
 proc-macro2 = "1"
 quote = "1"
 cfg-if = "1"
-toml = "0.9"
+toml = "1"
 serde = { version = "1", features = ["derive"] }
-zip = { version = "6", features = [
+zip = { version = "8", features = [
 	"deflate",
 	"deflate64",
 	"lzma",
