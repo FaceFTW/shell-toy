@@ -23,9 +23,9 @@ jobs:
             feature_flags: "--features inline-fortune,inline-off-fortune,inline-cowsay"
     steps:
       - uses: actions/checkout@v4
+
       - name: "Install Fixed Rust Toolchain"
-        run: rustup default 1.85
+        run: rustup default stable
+
       - name: Cargo Build
         run: cargo build ${{ matrix.feature_flags }} --release -vv
-
-
