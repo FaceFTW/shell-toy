@@ -2,12 +2,11 @@
 name = "shell-toy"
 version = "0.7.2"
 edition = "2024"
+rust-version = "1.95"
 description = "A \"fortune | cowsay\" implementation in Rust, i.e. a nice little toy to liven up your shell."
 license = "MIT"
 repository = "https://github.com/FaceFTW/shell-toy"
 keywords = ["terminal", "customization", "fortune", "cowsay", "fortune-cookie"]
-
-
 
 [[bin]]
 name = "sh-toy"
@@ -17,7 +16,7 @@ path = "src/main.rs"
 owo-colors = "4"
 winnow = "1.0"
 tinyrand = "0.5"
-getrandom = "0.3"
+getrandom = "0.4"
 argh = "0.1"
 textwrap = "0.16"
 strip-ansi-escapes = "0.2"

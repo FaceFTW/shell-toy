@@ -20,27 +20,28 @@ fn main() {
 
     //Short Circuits for other things (aside from help)
     if options.list_cows {
-        #[cfg(feature = "inline-cowsay")]
-        get_cow_names();
-        #[cfg(not(feature = "inline-cowsay"))]
-        get_cow_names(&options.cow_path);
+        cfg_select! {
+            feature = "inline-cowsay" => { get_cow_names(); }
+            not(feature = "inline-cowsay") => { get_cow_names(&options.cow_path); }
+        };
     } else {
-        #[cfg(feature = "inline-cowsay")]
-        let cow_str = get_cow_string(&options.cow_file, &mut rng);
-        #[cfg(not(feature = "inline-cowsay"))]
-        let cow_str = get_cow_string(&options.cow_file, &options.cow_path, &mut rng);
+        let cow_str = cfg_select! {
+             feature = "inline-cowsay" => { get_cow_string(&options.cow_file, &mut rng) }
+             not(feature = "inline-cowsay") => { get_cow_string(&options.cow_file, &options.cow_path, &mut rng) }
+        };
 
         let cow_msg = match options.message {
             Some(msg) => msg,
             None => {
-                cfg_if::cfg_if! {
-                    if #[cfg(feature="inline-fortune")]{
-                            fortune::get_inline_fortune(&mut rng, options.include_offensive, options.fortune_width, options.fortune_lines)
-                                .expect("Could not read internal fortune index, your future is shrouded in mystery...")
-                    } else {
+                cfg_select! {
+                    feature = "inline-fortune" => {
+                        fortune::get_inline_fortune(&mut rng, options.include_offensive, options.fortune_width, options.fortune_lines)
+                        .expect("Could not read internal fortune index, your future is shrouded in mystery...")
+                    }
+                    not(feature = "inline-fortune") => {
                         let fortune_file = fortune::choose_fortune_file(options.include_offensive, &mut rng, options.fortune_file );
                         fortune::get_fortune(fortune_file, &mut rng, options.fortune_width, options.fortune_lines)
-                    .expect("Could not get a fortune, your future is shrouded in mystery...")
+                        .expect("Could not get a fortune, your future is shrouded in mystery...")
                     }
                 }
             }
