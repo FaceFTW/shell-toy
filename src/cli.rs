@@ -1,4 +1,4 @@
-use std::{error::Error, ffi::OsStr, fs, io, path::PathBuf};
+use std::{ffi::OsStr, fs, path::PathBuf};
 
 use argh::FromArgs;
 
@@ -66,14 +66,6 @@ pub(crate) struct Options {
     pub message: Option<String>,
 }
 
-macro_rules! illegal_file_suffixes {
-    ($($ext:literal),*) => {
-        [
-            $(std::ffi::OsStr::new($ext)),*
-        ]
-    };
-}
-
 impl Options {
     pub fn post_init(opts: Options) -> Options {
         // Cascade all options except for cow and fortunes which
@@ -83,24 +75,27 @@ impl Options {
                 0 => {
                     cfg_select! {
                         feature = "inline-cowsay" => { Vec::new() }
-                        not(feature = "inline-cowsay") => { Vec::new() }
+                        not(feature = "inline-cowsay") => {
+                            //TODO pull from default cowsay folder
+                            Vec::new()
+                        }
                     }
                 }
                 1 => {
                     cfg_select! {
+                        // Provides the name of the cow to look for in the index
                         feature = "inline-cowsay" => { opts.cows }
-                        not(feature = "inline-cowsay") => { enumerate_files(&PathBuf::from(&opts.cows[0]), Some(&OsStr::new("cow")), None).expect("Could not enumerate cow files in specified path") }
+                        //TODO this logic needs to find the file from the COW_PATH if it is set, panic if env not set
+                        not(feature = "inline-cowsay") => { enumerate_cows(&PathBuf::from(&opts.cows[0])) }
                     }
                 }
                 _ => opts
                     .cows
                     .into_iter()
-                    .flat_map(|path| {
-                        enumerate_files(&PathBuf::from(path), Some(&OsStr::new("cow")), None)
-                            .expect("Could not open some of the files listed")
-                    })
+                    .flat_map(|path| enumerate_cows(&PathBuf::from(path)))
                     .collect(),
             },
+
             fortunes: match opts.fortunes.len() {
                 0 => cfg_select! {
                     feature = "inline-fortune" => {
@@ -110,29 +105,13 @@ impl Options {
                         if let Ok(val) = std::env::var("FORTUNE_FILE") {
                             vec![val]
                         } else if let Ok(val) = std::env::var("FORTUNE_PATH") {
-                            enumerate_files(
-                                &PathBuf::from(val),
-                                None,
-                                Some(&illegal_file_suffixes!(
-                                    "dat", "pos", "c", "h", "p", "i", "f", "pas", "ftn", "ins.c",
-                                    "ins.pas", "ins.ftn", "sml", "sh", "pl", "csv"
-                                )),
-                            )
-                            .expect("Could not open some of the files in the FORTUNE_PATH")
+                           enumerate_fortunes(&PathBuf::from(val))
                         } else {
                             match std::env::consts::OS {
-                                "linux" =>
-                                    enumerate_files(
-                                        &PathBuf::from("/usr/share/games/fortunes"),
-                                        None,
-                                        Some(&illegal_file_suffixes!(
-                                            "dat", "pos", "c", "h", "p", "i", "f", "pas", "ftn", "ins.c",
-                                            "ins.pas", "ins.ftn", "sml", "sh", "pl", "csv"
-                                        )),
-                                    )
-                                    .expect("Could not open some of the files in the default fortunes directory")
+                                "linux" => enumerate_fortunes(&PathBuf::from("/usr/share/games/fortunes")),
                                 _ => panic!(
-                                    "I don't know what the default path for fortunes are for this OS!.\nPlease provide a FORTUNEPATH or FORTUNE_PATH environment variable, or a single file with FORTUNE_FILE"
+                                    "I don't know what the default path for fortunes are for this OS!. \
+                                    Please provide a FORTUNE_PATH environment variable, or a single file with FORTUNE_FILE"
                                 ),
                             }
                         }
@@ -141,19 +120,10 @@ impl Options {
                 _ => opts
                     .fortunes
                     .into_iter()
-                    .flat_map(|path| {
-                        enumerate_files(
-                            &PathBuf::from(path),
-                            None,
-                            Some(&illegal_file_suffixes!(
-                                "dat", "pos", "c", "h", "p", "i", "f", "pas", "ftn", "ins.c",
-                                "ins.pas", "ins.ftn", "sml", "sh", "pl", "csv"
-                            )),
-                        )
-                        .expect("Could not open some of the files listed")
-                    })
+                    .flat_map(|path| enumerate_fortunes(&PathBuf::from(path)))
                     .collect(),
             },
+
             ..opts
         }
     }
@@ -163,49 +133,99 @@ fn enumerate_files(
     path: &PathBuf,
     extension: Option<&OsStr>,
     excluded_exts: Option<&[&OsStr]>,
-) -> Result<Vec<String>, io::Error> {
+) -> Vec<String> {
     let mut total_list = vec![];
-    match fs::metadata(path)?.file_type() {
+    match fs::metadata(path)
+        .expect(&format!("Could not get metadata for path {path:?}"))
+        .file_type()
+    {
         //TODO non-unicode handling
-        ft if ft.is_file() => Ok(vec![path.to_string_lossy().to_string()]),
+        ft if ft.is_file() => vec![path.to_string_lossy().to_string()],
         ft if ft.is_dir() => {
-            let dir_list = fs::read_dir(path)?.filter(|item| match excluded_exts {
-                Some(excludes) => excludes.contains(
-                    &item
-                        .as_ref()
-                        .unwrap()
-                        .path()
-                        .extension()
-                        .unwrap_or_default(),
-                ),
-                None => true,
-            });
+            let dir_list = fs::read_dir(path)
+                .expect(&format!("Could not open the directory {path:?}"))
+                .filter(|item| match excluded_exts {
+                    Some(excludes) => excludes.contains(
+                        &item
+                            .as_ref()
+                            .unwrap() //TODO this is a bug waiting to happen
+                            .path()
+                            .extension()
+                            .unwrap_or_default(),
+                    ),
+                    None => true,
+                });
 
             for entry in dir_list {
                 match entry {
-                    Ok(item) => match item.metadata()?.is_dir() {
+                    Ok(item) => match item
+                        .metadata()
+                        .expect(&format!(
+                            "Could not get metadata for file entry {}",
+                            item.path().to_string_lossy(),
+                        ))
+                        .is_dir()
+                    {
                         true => total_list.append(
-                            enumerate_files(&item.path(), extension, excluded_exts)
-                                .unwrap()
-                                .as_mut(),
+                            enumerate_files(&item.path(), extension, excluded_exts).as_mut(),
                         ),
                         false => match extension {
                             Some(ext) => {
-                                if item.path().extension().unwrap() == ext {
-                                    total_list.push(item.path().to_str().unwrap().to_string());
+                                if let Some(file_ext) = item.path().extension()
+                                    && file_ext == ext
+                                {
+                                    total_list.push(handle_path(item));
                                 }
                             }
-                            None => total_list.push(item.path().to_str().unwrap().to_string()),
+                            None => total_list.push(handle_path(item)),
                         },
                     },
-                    Err(e) => return Err(e),
+                    Err(e) => panic!("Could not enumerate some file entries: {e}"),
                 }
             }
-            Ok(total_list)
+            total_list
         }
-        //TODO probably don't want to panic, but it does the job
         _ => panic!("Encountered path {path:?} which was not a file or directory!"),
     }
+}
+
+//TODO check effect of inlining
+#[inline]
+fn handle_path(item: std::fs::DirEntry) -> String {
+    item.path()
+        .to_str()
+        .expect(
+               &format!(
+                    "Encounted a file with invalid unicode in it's path.\nThe path with invalid unicode removed: {}",
+                    item.path().to_string_lossy())
+        ).to_string()
+}
+
+macro_rules! illegal_file_suffixes {
+    ($($ext:literal),*) => {
+        [
+            $(std::ffi::OsStr::new($ext)),*
+        ]
+    };
+}
+
+//TODO check effect of inlining
+#[inline]
+fn enumerate_fortunes(path: &PathBuf) -> Vec<String> {
+    enumerate_files(
+        &PathBuf::from(path),
+        None,
+        Some(&illegal_file_suffixes!(
+            "dat", "pos", "c", "h", "p", "i", "f", "pas", "ftn", "ins.c", "ins.pas", "ins.ftn",
+            "sml", "sh", "pl", "csv"
+        )),
+    )
+}
+
+//TODO check effect of inlining
+#[inline]
+fn enumerate_cows(path: &PathBuf) -> Vec<String> {
+    enumerate_files(&PathBuf::from(path), Some(&OsStr::new("cow")), None)
 }
 
 fn parse_bubble_type(value: &str) -> Result<BubbleType, String> {
