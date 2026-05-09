@@ -29,19 +29,14 @@ fn main() {
 
     let cow_msg = match options.message {
         Some(msg) => msg,
-        None => {
-            cfg_select! {
-                feature = "inline-fortune" => {
-                    fortune::get_inline_fortune(&mut rng, options.include_offensive, options.fortune_width, options.fortune_lines)
-                    .expect("Could not read internal fortune index, your future is shrouded in mystery...")
-                }
-                not(feature = "inline-fortune") => {
-                    let fortune_file = fortune::choose_fortune_file(options.include_offensive, &mut rng, options.fortunes );
-                    fortune::get_fortune(fortune_file, &mut rng, options.fortune_width, options.fortune_lines)
-                    .expect("Could not get a fortune, your future is shrouded in mystery...")
-                }
-            }
-        }
+        None => fortune::get_fortune(
+            &options.fortunes,
+            &mut rng,
+            options.include_offensive,
+            options.fortune_width,
+            options.fortune_lines,
+        )
+        .expect("Could not get a fortune, your future is shrouded in mystery..."),
     };
 
     let cow_variant = match options.cow_variant {
