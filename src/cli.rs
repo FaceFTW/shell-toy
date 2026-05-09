@@ -1,4 +1,8 @@
-use std::{ffi::OsStr, fs, path::PathBuf};
+use std::{
+    ffi::OsStr,
+    fs,
+    path::{Path, PathBuf},
+};
 
 use argh::FromArgs;
 
@@ -9,8 +13,8 @@ use crate::cowsay::{BubbleType, CowVariant};
 pub(crate) struct Options {
     // #[cfg(not(feature = "inline-cowsay"))]
     #[argh(option, short = 'c')]
-    /// path to a direct cowfile, a folder containing cow files, or the
-    /// name of a cow file in the COW_PATH if set. Can be repeated to search through multiple paths
+    /// path to a direct cowfile, a folder containing cow files, or the name of the cow
+    /// present in the shell-toy binary. Can be repeated to search through multiple paths
     pub cows: Vec<String>,
 
     #[cfg(feature = "inline-cowsay")]
@@ -76,8 +80,15 @@ impl Options {
                     cfg_select! {
                         feature = "inline-cowsay" => { Vec::new() }
                         not(feature = "inline-cowsay") => {
-                            //TODO pull from default cowsay folder
-                            Vec::new()
+                            if let Ok(val) = std::env::var("COW_PATH"){
+                               enumerate_cows(&PathBuf::from(val))
+                            } else {
+                               match std::env::consts::OS {
+                                   "linux" => vec![String::from("/usr/share/cowsay/cows")],
+                                   _ => panic!("I don't know what the default path for cowsay files are for this OS! \
+                                               Please set the COW_PATH environment variable to where the cow files are located.")
+                               }
+                            }
                         }
                     }
                 }
@@ -85,7 +96,6 @@ impl Options {
                     cfg_select! {
                         // Provides the name of the cow to look for in the index
                         feature = "inline-cowsay" => { opts.cows }
-                        //TODO this logic needs to find the file from the COW_PATH if it is set, panic if env not set
                         not(feature = "inline-cowsay") => { enumerate_cows(&PathBuf::from(&opts.cows[0])) }
                     }
                 }

@@ -342,7 +342,6 @@ pub fn print_cowsay(
     let mut style_buffer = StyleBuffer::new();
     let cow_str = derive_cow_str(
         parser_it.collect::<Vec<TerminalCharacter>>().as_slice(),
-        // scan_it.collect::<Vec<TerminalCharacter>>().as_slice(),
         &mut style_buffer,
         cow_variant,
     );
@@ -366,58 +365,26 @@ pub fn get_cow_by_name(name: &str) -> Option<&str> {
         .find_map(|item| if item.0 == name { Some(item.1) } else { None })
 }
 
-#[cfg(not(feature = "inline-cowsay"))]
-fn get_list_of_cows(path: &PathBuf) -> Result<Vec<String>, io::Error> {
-    let mut total_list = vec![];
-    let dir_list = fs::read_dir(path)?;
-    for entry in dir_list {
-        match entry {
-            Ok(item) => match item.metadata()?.is_dir() {
-                true => total_list.append(get_list_of_cows(&item.path()).unwrap().as_mut()),
-                false => {
-                    if item.path().extension().unwrap() == "cow" {
-                        total_list.push(item.path().to_str().unwrap().to_string());
-                    }
+pub fn choose_random_cow(cow_list: &[String], rng: &mut impl Rand) -> String {
+    cfg_select! {
+        feature = "inline-cowsay" => {
+             let chosen_idx = rng.next_lim_usize(cow_list.len());
+             cow_list[chosen_idx].1.to_string()
+        }
+        not(feature = "inline-cowsay") => {
+            let chosen_idx = rng.next_lim_usize(cow_list.len());
+
+            let chosen_path = &cow_list[chosen_idx];
+            match fs::File::open(chosen_path) {
+                Ok(mut file) => {
+                    let mut cow_str = String::new();
+                    file.read_to_string(&mut cow_str)
+                        .expect("Error reading cow string");
+                    cow_str
                 }
-            },
-            Err(e) => return Err(e),
-        }
-    }
-    Ok(total_list)
-}
+                Err(e) => panic!("{e}"),
+            }
 
-#[cfg(not(feature = "inline-cowsay"))]
-pub fn choose_random_cow(cow_path: &PathBuf, rng: &mut impl Rand) -> String {
-    let cow_list = get_list_of_cows(&cow_path).expect("Could not open the cow path");
-
-    let chosen_idx = rng.next_lim_usize(cow_list.len());
-
-    let chosen_path = &cow_list[chosen_idx];
-    match fs::File::open(chosen_path) {
-        Ok(mut file) => {
-            let mut cow_str = String::new();
-            file.read_to_string(&mut cow_str)
-                .expect("Error reading cow string");
-            cow_str
-        }
-        Err(e) => panic!("{e}"),
-    }
-}
-
-#[cfg(not(feature = "inline-cowsay"))]
-pub fn identify_cow_path(defined_path: &Option<String>) -> PathBuf {
-    //Check if we have an environment variable defined:
-    let os = std::env::consts::OS;
-    if let Some(path) = defined_path {
-        PathBuf::from(path)
-    } else if let Ok(val) = std::env::var("COW_PATH") {
-        PathBuf::from(val.as_str())
-    } else {
-        match os {
-            "linux" => PathBuf::from("/usr/share/cowsay/cows"),
-            _ => panic!(
-                "I don't know what the default path for cowfiles is for this OS!.\nPlease provide a COWPATH or COW_PATH environment variable"
-            ),
         }
     }
 }
@@ -425,91 +392,67 @@ pub fn identify_cow_path(defined_path: &Option<String>) -> PathBuf {
 /******************************************
  * Public Facing Methods
  *****************************************/
-#[cfg(feature = "inline-cowsay")]
-pub fn get_cow_string(cow_file: &Option<String>, rng: &mut impl tinyrand::Rand) -> String {
-    if let Some(cow_name) = cow_file {
-        get_cow_by_name(&cow_name.as_str())
-            .expect("Could not find a cow with the specified name in the inlined data")
-            .to_string()
-    } else {
-        choose_random_cow(rng)
-    }
-}
-#[cfg(feature = "inline-cowsay")]
-pub fn get_cow_names() {
-    //TODO I wish there was a more expressive way of doing this
-    let mut names_vec = COW_DATA.map(|val| val.0);
-    names_vec.sort();
-    let mut names_iter = names_vec.into_iter();
-    let first_name = names_iter.next().unwrap();
-    let names_string = names_iter.fold(String::from(first_name), |acc, e| format!("{acc}, {e}"));
-    println!("Available Cow Files:\n{names_string}");
-}
-
-#[cfg(not(feature = "inline-cowsay"))]
-pub fn get_cow_string(
-    cow_file: &Option<String>,
-    cow_path: &Option<String>,
-    rng: &mut impl tinyrand::Rand,
-) -> String {
-    match cow_file {
-        Some(cow_name_or_file) => {
-            //do a simple check, if we see no slashes and no .cow suffix,
-            // try looking in the cowpath if we can find it
-            if !cow_name_or_file.contains(std::path::MAIN_SEPARATOR)
-                && !cow_name_or_file.ends_with(".cow")
-            {
-                let cow_path = identify_cow_path(cow_path);
-                let cow_list = get_list_of_cows(&cow_path)
-                    .expect("Could not get a list of cows in the identified cow path");
-                let file_path = cow_list
-                    .into_iter()
-                    .find(|item| item.contains(cow_name_or_file) && item.ends_with(".cow"))
-                    .expect("Could not find a cow with the specified name in the defined cow path");
-                match File::open(file_path) {
-                    Ok(mut file) => {
-                        let mut cow_str = String::new();
-                        file.read_to_string(&mut cow_str)
-                            .expect("Error reading Cowfile");
-                        cow_str
-                    }
-                    Err(e) => panic!("{e}"),
-                }
-            } else {
-                match File::open(cow_name_or_file) {
-                    Ok(mut file) => {
-                        let mut cow_str = String::new();
-                        file.read_to_string(&mut cow_str)
-                            .expect("Error reading Cowfile");
-                        cow_str
-                    }
-                    Err(e) => panic!("{e}"),
-                }
+pub fn get_cow_string(cow_files: &[String], rng: &mut impl tinyrand::Rand) -> String {
+    cfg_select! {
+        feature = "inline-cowsay" => {
+            match cow_files.len() {
+                1 => get_cow_by_name(&cow_files[0].as_str())
+                        .expect("Could not find a cow with the specified name in the inlined data")
+                        .to_string(),
+                _ => choose_random_cow(&COW_DATA, rng)
             }
         }
-        None => {
-            let cow_path = identify_cow_path(cow_path);
-            choose_random_cow(&cow_path, rng)
+        not(feature = "inline-cowsay") => {
+            match cow_files.len() {
+             1 => {
+                // do a simple check, if no .cow suffix, panic early
+                if !cow_files[0].ends_with(".cow") {
+                    panic!("File is not a valid cow file (ends with .cow).")
+                } else {
+                    match File::open(cow_files[0].clone()) {
+                        Ok(mut file) => {
+                            let mut cow_str = String::new();
+                            file.read_to_string(&mut cow_str).expect("Error reading Cowfile");
+                            cow_str
+                        }
+                        Err(e) => panic!("{e}"),
+                    }
+                }
+            }
+            _ => choose_random_cow(&cow_files, rng)
+            }
         }
     }
 }
 
 #[cfg(not(feature = "inline-cowsay"))]
-pub fn get_cow_names(provided_path: &Option<String>) {
-    let cow_path = identify_cow_path(provided_path);
-    let mut cow_list = get_list_of_cows(&cow_path)
-        .expect("Could not get the cows listed in the identified cow path");
-    cow_list.sort();
-    let mut names_iter = cow_list.into_iter().map(|item| {
-        let path = PathBuf::from(item);
-        path.file_name()
-            .unwrap()
-            .to_os_string()
-            .into_string()
-            .unwrap()
-            .replace(".cow", "")
-    });
-    let first_name = names_iter.next().unwrap_or_default();
-    let names_string = names_iter.fold(String::from(first_name), |acc, e| format!("{acc}, {e}"));
-    println!("Available Cow Files:\n{names_string}");
+pub fn get_cow_names(_path_list: &[String]) {
+    cfg_select! {
+        feature = "inline-cowsay" => {
+            //TODO I wish there was a more expressive way of doing this
+            let mut names_vec = COW_DATA.map(|val| val.0);
+            names_vec.sort();
+            let mut names_iter = names_vec.into_iter();
+            let first_name = names_iter.next().unwrap();
+            let names_string = names_iter.fold(String::from(first_name), |acc, e| format!("{acc}, {e}"));
+            println!("Available Cow Files:\n{names_string}");
+        }
+        not(feature = "inline-cowsay") => {
+            //TODO sort this
+            let mut names_iter = _path_list.into_iter().map(|item| {
+                let path = PathBuf::from(item);
+                path.file_name()
+                    .unwrap()
+                    .to_os_string()
+                    .into_string()
+                    .unwrap()
+                    .replace(".cow", "")
+            });
+            let first_name = names_iter.next().unwrap_or_default();
+            let names_string = names_iter.fold(String::from(first_name), |acc, e| format!("{acc}, {e}"));
+            println!("Available Cow Files:\n{names_string}");
+
+        }
+
+    }
 }
