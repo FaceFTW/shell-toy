@@ -14,7 +14,9 @@ fn main() {
     getrandom::fill(&mut buf).expect("Could not open entropy source!");
     let mut rng = StdRand::seed(u64::from_le_bytes(buf));
 
-    let options: Options = argh::from_env();
+    let options: Options = argh::from_env::<Options>().post_init();
+
+    dbg!(&options);
 
     //Short Circuits for other things (aside from help)
     // if options.list_cows {

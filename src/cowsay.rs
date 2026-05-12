@@ -193,7 +193,7 @@ impl StyleBuffer {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum CowVariant {
     Borg,
     Dead,

@@ -8,7 +8,7 @@ use argh::FromArgs;
 
 use crate::cowsay::{BubbleType, CowVariant};
 
-#[derive(FromArgs)]
+#[derive(FromArgs, Debug)]
 /// various program options
 pub(crate) struct Options {
     // #[cfg(not(feature = "inline-cowsay"))]
@@ -71,11 +71,11 @@ pub(crate) struct Options {
 }
 
 impl Options {
-    pub fn post_init(opts: Options) -> Options {
+    pub fn post_init(self) -> Options {
         // Cascade all options except for cow and fortunes which
         // should instead populate the individual files to operate on.
         Options {
-            cows: match opts.cows.len() {
+            cows: match self.cows.len() {
                 0 => {
                     cfg_select! {
                         feature = "inline-cowsay" => { Vec::new() }
@@ -95,18 +95,18 @@ impl Options {
                 1 => {
                     cfg_select! {
                         // Provides the name of the cow to look for in the index
-                        feature = "inline-cowsay" => { opts.cows }
-                        not(feature = "inline-cowsay") => { enumerate_cows(&PathBuf::from(&opts.cows[0])) }
+                        feature = "inline-cowsay" => { self.cows }
+                        not(feature = "inline-cowsay") => { enumerate_cows(&PathBuf::from(&self.cows[0])) }
                     }
                 }
-                _ => opts
+                _ => self
                     .cows
                     .into_iter()
                     .flat_map(|path| enumerate_cows(&PathBuf::from(path)))
                     .collect(),
             },
 
-            fortunes: match opts.fortunes.len() {
+            fortunes: match self.fortunes.len() {
                 0 => cfg_select! {
                     feature = "inline-fortune" => {
                         Vec::new()
@@ -127,14 +127,14 @@ impl Options {
                         }
                     }
                 },
-                _ => opts
+                _ => self
                     .fortunes
                     .into_iter()
                     .flat_map(|path| enumerate_fortunes(&PathBuf::from(path)))
                     .collect(),
             },
 
-            ..opts
+            ..self
         }
     }
 }
