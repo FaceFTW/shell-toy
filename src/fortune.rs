@@ -1,11 +1,5 @@
 use std::error::Error;
-#[cfg(not(feature = "inline-fortune"))]
-use std::{
-    ffi::OsStr,
-    fs::{self, File},
-    io::{self, Read},
-    path::PathBuf,
-};
+use std::{fs::File, io::Read};
 use tinyrand::Rand;
 
 fn check_fortune_constraints(
@@ -34,8 +28,42 @@ fn check_fortune_constraints(
     })
 }
 
+fn get_external_fortune(
+    rng: &mut impl Rand,
+    list: &[String],
+    include_off: bool,
+    max_width: Option<u64>,
+    max_lines: Option<u64>,
+) -> Result<String, Box<dyn Error>> {
+    let file_path = match include_off {
+        true => {
+            let idx = rng.next_lim_usize(list.len());
+            list[idx].clone()
+        }
+        false => {
+            let filtered: Vec<&String> = list.into_iter().filter(|x| !x.contains("off")).collect();
+            let idx = rng.next_lim_usize(filtered.len());
+            filtered[idx].clone()
+        }
+    };
+
+    match File::open(file_path) {
+        Ok(mut file) => {
+            let mut string_buf = String::new();
+            let _result = file.read_to_string(&mut string_buf)?;
+            let no_cr = string_buf.replace("\r", "");
+            let split: Vec<&str> = no_cr
+                .split("\n%\n")
+                .filter(|element| check_fortune_constraints(element, max_width, max_lines))
+                .collect();
+            let chosen_idx = rng.next_lim_usize(split.len());
+            Ok(split[chosen_idx].to_string())
+        }
+        Err(e) => panic!("Could not open Fortune file! {e}"),
+    }
+}
+
 ///default method of getting a fortune, without using the index file.
-#[cfg(not(feature = "inline-fortune"))]
 pub fn get_fortune(
     _fortune_files: &[String],
     rng: &mut impl Rand,
@@ -45,55 +73,52 @@ pub fn get_fortune(
 ) -> Result<String, Box<dyn Error>> {
     cfg_select! {
         feature = "inline-fortune" => {
-            macro_rules! choose_inline_fortune {
-                ($rng_ident:ident, $list_ident:ident, $max_wid_ident:ident, $max_lines_ident:ident) => {{
-                    let list_iter: Vec<&'static str> = $list_ident
-                        .into_iter()
-                        .filter(|element| {
-                            check_fortune_constraints(element, $max_wid_ident, $max_lines_ident)
-                        })
-                        .collect();
-                    let chosen_idx = $rng_ident.next_lim_usize(list_iter.len());
-                    Ok($list_ident[chosen_idx].to_string())
-                }};
-            }
-
-            cfg_if::cfg_if! {
-                if #[cfg(feature="inline-off-fortune")]{
-                    if include_offensive {
-                        let weight_off:f64 = OFF_FORTUNE_LIST.len() as f64/(FORTUNE_LIST.len() as f64 + OFF_FORTUNE_LIST.len() as f64);
-                        match rng.next_bool(weight_off.into()){
-                            true => choose_inline_fortune!(rng, OFF_FORTUNE_LIST, max_width, max_lines),
-                            false => choose_inline_fortune!(rng, FORTUNE_LIST, max_width, max_lines),
-                        }
-                    } else {
-                        choose_inline_fortune!(rng, FORTUNE_LIST, max_width, max_lines)
+            if !_fortune_files.is_empty(){
+                get_external_fortune(
+                     rng,
+                     _fortune_files,
+                     include_offensive,
+                     max_width,
+                     max_lines
+                )
+            } else {
+                let list = match include_offensive {
+                    true => {
+                        cfg_select! {
+                             feature = "inline-off-fortune" => {
+                                 if include_offensive {
+                                     let weight_off:f64 = OFF_FORTUNE_LIST.len() as f64/(FORTUNE_LIST.len() as f64 + OFF_FORTUNE_LIST.len() as f64);
+                                     match rng.next_bool(weight_off.into()){
+                                         true => OFF_FORTUNE_LIST,
+                                         false => FORTUNE_LIST,
+                                     }
+                                 } else {
+                                     FORTUNE_LIST
+                                 }
+                             }
+                             not(feature = "inline-off-fortune") => { FORTUNE_LIST }
+                         }
                     }
-                } else {
-                    let _ = include_offensive;
-                    choose_inline_fortune!(rng, FORTUNE_LIST, max_width, max_lines)
-                }
+                    false => FORTUNE_LIST,
+                };
+
+                let list_iter: Vec<&'static str> = list
+                    .into_iter()
+                    .filter(|element| check_fortune_constraints(element, max_width, max_lines))
+                    .collect();
+                let chosen_idx = rng.next_lim_usize(list_iter.len());
+                Ok(list[chosen_idx].to_string())
             }
 
         }
         not(feature = "inline-fortune") => {
-            // TODO Choose the file to open, exclude offensive as necessary
-
-            match File::open(file_path) {
-                Ok(mut file) => {
-                    let mut string_buf = String::new();
-                    let _result = file.read_to_string(&mut string_buf)?;
-                    let no_cr = string_buf.replace("\r", "");
-                    let split: Vec<&str> = no_cr
-                        .split("\n%\n")
-                        .filter(|element| check_fortune_constraints(element, max_width, max_lines))
-                        .collect();
-                    let chosen_idx = rng.next_lim_usize(split.len());
-                    Ok(split[chosen_idx].to_string())
-                }
-                Err(e) => panic!("Could not open Fortune file! {e}"),
-            }
-
+           get_external_fortune(
+                rng,
+                _fortune_files,
+                include_offensive,
+                max_width,
+                max_lines
+            )
         }
     }
 }

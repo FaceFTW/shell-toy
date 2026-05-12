@@ -1,10 +1,9 @@
 use crate::parser::{ParserIterator, TerminalCharacter};
 use owo_colors::{DynColor, OwoColorize, Style, XtermColors};
 use std::{collections::HashMap, error::Error, str::from_utf8};
-#[cfg(not(feature = "inline-cowsay"))]
 use std::{
     fs::{self, File},
-    io::{self, Read},
+    io::Read,
     path::PathBuf,
 };
 use strip_ansi_escapes::strip;
@@ -353,39 +352,38 @@ pub fn print_cowsay(
 }
 
 #[cfg(feature = "inline-cowsay")]
-pub fn choose_random_cow(rng: &mut impl Rand) -> String {
-    let chosen_idx = rng.next_lim_usize(COW_DATA.len());
-    COW_DATA[chosen_idx].1.to_string()
-}
-
-#[cfg(feature = "inline-cowsay")]
 pub fn get_cow_by_name(name: &str) -> Option<&str> {
     COW_DATA
         .into_iter()
         .find_map(|item| if item.0 == name { Some(item.1) } else { None })
 }
 
+fn get_external_cow(cow_list: &[String], rng: &mut impl Rand) -> String {
+    let chosen_idx = rng.next_lim_usize(cow_list.len());
+
+    let chosen_path = &cow_list[chosen_idx];
+    match fs::File::open(chosen_path) {
+        Ok(mut file) => {
+            let mut cow_str = String::new();
+            file.read_to_string(&mut cow_str)
+                .expect("Error reading cow string");
+            cow_str
+        }
+        Err(e) => panic!("{e}"),
+    }
+}
+
 pub fn choose_random_cow(cow_list: &[String], rng: &mut impl Rand) -> String {
     cfg_select! {
         feature = "inline-cowsay" => {
-             let chosen_idx = rng.next_lim_usize(cow_list.len());
-             cow_list[chosen_idx].1.to_string()
-        }
-        not(feature = "inline-cowsay") => {
-            let chosen_idx = rng.next_lim_usize(cow_list.len());
-
-            let chosen_path = &cow_list[chosen_idx];
-            match fs::File::open(chosen_path) {
-                Ok(mut file) => {
-                    let mut cow_str = String::new();
-                    file.read_to_string(&mut cow_str)
-                        .expect("Error reading cow string");
-                    cow_str
-                }
-                Err(e) => panic!("{e}"),
+            if !cow_list.is_empty() {
+                  get_external_cow(cow_list, rng)
+              } else {
+                 let chosen_idx = rng.next_lim_usize(COW_DATA.len());
+                 COW_DATA[chosen_idx].1.to_string()
             }
-
         }
+        not(feature = "inline-cowsay") => { get_external_cow(cow_list, rng) }
     }
 }
 
@@ -399,7 +397,7 @@ pub fn get_cow_string(cow_files: &[String], rng: &mut impl tinyrand::Rand) -> St
                 1 => get_cow_by_name(&cow_files[0].as_str())
                         .expect("Could not find a cow with the specified name in the inlined data")
                         .to_string(),
-                _ => choose_random_cow(&COW_DATA, rng)
+                _ => choose_random_cow(&[], rng)
             }
         }
         not(feature = "inline-cowsay") => {

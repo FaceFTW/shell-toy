@@ -4,9 +4,7 @@ mod fortune;
 mod parser;
 
 use cli::Options;
-use cowsay::{
-    CowVariant, SpeechBubble, get_cow_names, get_cow_string, print_cowsay, random_cow_variant,
-};
+use cowsay::{CowVariant, SpeechBubble, get_cow_string, print_cowsay, random_cow_variant};
 
 use tinyrand::{Seeded, StdRand};
 
@@ -44,6 +42,7 @@ fn main() {
         _ => options.cow_variant,
     };
 
+    //TODO why did I do this
     let max_width = match options.max_width {
         Some(val) => val as usize,
         None => 64usize,
