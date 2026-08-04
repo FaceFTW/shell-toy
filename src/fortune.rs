@@ -89,17 +89,17 @@ pub fn get_fortune(
                                  if include_offensive {
                                      let weight_off:f64 = OFF_FORTUNE_LIST.len() as f64/(FORTUNE_LIST.len() as f64 + OFF_FORTUNE_LIST.len() as f64);
                                      match rng.next_bool(weight_off.into()){
-                                         true => OFF_FORTUNE_LIST,
-                                         false => FORTUNE_LIST,
+                                         true => OFF_FORTUNE_LIST.as_slice(),
+                                         false => FORTUNE_LIST.as_slice(),
                                      }
                                  } else {
-                                     FORTUNE_LIST
+                                     FORTUNE_LIST.as_slice()
                                  }
                              }
-                             not(feature = "inline-off-fortune") => { FORTUNE_LIST }
+                             not(feature = "inline-off-fortune") => { FORTUNE_LIST.as_slice() }
                          }
                     }
-                    false => FORTUNE_LIST,
+                    false => FORTUNE_LIST.as_slice(),
                 };
 
                 let list_iter: Vec<&'static str> = list
