@@ -1,8 +1,4 @@
-use std::{
-    ffi::OsStr,
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{ffi::OsStr, fs, path::PathBuf};
 
 use argh::FromArgs;
 
@@ -17,9 +13,8 @@ pub(crate) struct Options {
     /// present in the shell-toy binary. Can be repeated to search through multiple paths
     pub cows: Vec<String>,
 
-    #[cfg(feature = "inline-cowsay")]
     #[argh(switch, short = 'l', long = "list-cows")]
-    /// lists the cows that are embedded in the executable
+    /// lists the cows available
     pub list_cows: bool,
 
     #[argh(

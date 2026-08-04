@@ -423,7 +423,6 @@ pub fn get_cow_string(cow_files: &[String], rng: &mut impl tinyrand::Rand) -> St
     }
 }
 
-#[cfg(not(feature = "inline-cowsay"))]
 pub fn get_cow_names(_path_list: &[String]) {
     cfg_select! {
         feature = "inline-cowsay" => {
