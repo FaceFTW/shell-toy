@@ -105,6 +105,7 @@ pub fn get_fortune(
                 let list_iter: Vec<&'static str> = list
                     .into_iter()
                     .filter(|element| check_fortune_constraints(element, max_width, max_lines))
+                    .map(|element| *element)
                     .collect();
                 let chosen_idx = rng.next_lim_usize(list_iter.len());
                 Ok(list[chosen_idx].to_string())
