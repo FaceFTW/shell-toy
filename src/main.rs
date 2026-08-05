@@ -16,34 +16,29 @@ fn main() {
     getrandom::fill(&mut buf).expect("Could not open entropy source!");
     let mut rng = StdRand::seed(u64::from_le_bytes(buf));
 
-    let options: Options = argh::from_env();
+    let options: Options = argh::from_env::<Options>().post_init();
+
+    dbg!(&options);
 
     //Short Circuits for other things (aside from help)
     if options.list_cows {
-        #[cfg(feature = "inline-cowsay")]
-        get_cow_names();
-        #[cfg(not(feature = "inline-cowsay"))]
-        get_cow_names(&options.cow_path);
+        cfg_select! {
+            feature = "inline-cowsay" => { get_cow_names(&[]); }
+            not(feature = "inline-cowsay") => { get_cow_names(options.cows.as_slice()); }
+        };
     } else {
-        #[cfg(feature = "inline-cowsay")]
-        let cow_str = get_cow_string(&options.cow_file, &mut rng);
-        #[cfg(not(feature = "inline-cowsay"))]
-        let cow_str = get_cow_string(&options.cow_file, &options.cow_path, &mut rng);
+        let cow_str = get_cow_string(&options.cows, &mut rng);
 
         let cow_msg = match options.message {
             Some(msg) => msg,
-            None => {
-                cfg_if::cfg_if! {
-                    if #[cfg(feature="inline-fortune")]{
-                            fortune::get_inline_fortune(&mut rng, options.include_offensive, options.fortune_width, options.fortune_lines)
-                                .expect("Could not read internal fortune index, your future is shrouded in mystery...")
-                    } else {
-                        let fortune_file = fortune::choose_fortune_file(options.include_offensive, &mut rng, options.fortune_file );
-                        fortune::get_fortune(fortune_file, &mut rng, options.fortune_width, options.fortune_lines)
-                    .expect("Could not get a fortune, your future is shrouded in mystery...")
-                    }
-                }
-            }
+            None => fortune::get_fortune(
+                &options.fortunes,
+                &mut rng,
+                options.include_offensive,
+                options.fortune_width,
+                options.fortune_lines,
+            )
+            .expect("Could not get a fortune, your future is shrouded in mystery..."),
         };
 
         let cow_variant = match options.cow_variant {
@@ -51,6 +46,7 @@ fn main() {
             _ => options.cow_variant,
         };
 
+        //TODO why did I do this
         let max_width = match options.max_width {
             Some(val) => val as usize,
             None => 64usize,
