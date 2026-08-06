@@ -2,7 +2,7 @@ use std::{
     // cell::RefCell,
     collections::HashMap,
     ffi::OsStr,
-    fs::{self, remove_file, File},
+    fs::{self, File, remove_file},
     io::{self, BufReader, Read, Write},
     path::PathBuf,
 };
@@ -180,7 +180,7 @@ fn create_fortune_db(settings: &BuildSettings) -> Result<(), std::io::Error> {
         println!("cargo::rerun-if-changed={path}");
 
         let mut concat_fortunes: String;
-        let off_concat_fortunes: String;
+        let mut off_concat_fortunes: String;
         match fs::metadata(&path)?.is_file() {
             true => {
                 //Assume file contains only non-offensive fortunes
@@ -194,12 +194,12 @@ fn create_fortune_db(settings: &BuildSettings) -> Result<(), std::io::Error> {
                 }
             }
             false => {
-                let (fortune_list, offensive_list) =
+                (concat_fortunes, off_concat_fortunes) =
                     get_fortune_strings(&PathBuf::from(path), false);
-                concat_fortunes = fortune_list.replace("\r\n", "\n");
-                off_concat_fortunes = offensive_list.replace("\r\n", "\n");
             }
         }
+        concat_fortunes.retain(|c| c != '\r');
+        off_concat_fortunes.retain(|c| c != '\r');
 
         //TODO probably need to pass settings as param no closure capture here
         let fortunes_split: Vec<&str> = concat_fortunes
@@ -396,20 +396,22 @@ fn get_source_archive(
                     .as_str(),
             ]);
             p
-        },
+        }
         "unix" => {
             let mut p = std::process::Command::new("curl");
             p.args(&[
                 "-L",
                 path,
                 "--output",
-                format!("{downloads_path}/{resource_name}.zip").as_str()
+                format!("{downloads_path}/{resource_name}.zip").as_str(),
             ]);
             p
-        },
-        _ => panic!("Are you being special and building this on a non-standard operating system. \
+        }
+        _ => panic!(
+            "Are you being special and building this on a non-standard operating system. \
         Good for you. But I can't figure out what command to use for downloading files. \
-        Consider modifying the get_external_resource function in build.rs since you are similar enough to an Arch Linux user :p")
+        Consider modifying the get_external_resource function in build.rs since you are similar enough to an Arch Linux user :p"
+        ),
     };
     proc.spawn()?.wait()?;
     Ok(())

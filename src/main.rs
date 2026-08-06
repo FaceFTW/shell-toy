@@ -18,7 +18,7 @@ fn main() {
 
     let options: Options = argh::from_env::<Options>().post_init();
 
-    dbg!(&options);
+    // dbg!(&options);
 
     //Short Circuits for other things (aside from help)
     if options.list_cows {
