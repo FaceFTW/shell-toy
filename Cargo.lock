@@ -390,7 +390,7 @@ dependencies = [
 
 [[package]]
 name = "shell-toy"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "argh",
  "cfg-if",
