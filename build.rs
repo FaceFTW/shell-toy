@@ -162,7 +162,6 @@ mod fortune {
         concat_fortunes.retain(|c| c != '\r');
         off_concat_fortunes.retain(|c| c != '\r');
 
-        //TODO probably need to pass settings as param no closure capture here
         let fortunes_split: Vec<&str> = concat_fortunes
             .split("\n%\n")
             .filter(|element| check_fortune_constraints(element, max_width, max_lines))
@@ -434,9 +433,10 @@ fn get_source_archive(
     check_dir_exists!(&resource_destination, clear_existing);
 
     //Short circuit if we aren't force-redownloading and the resource exists
+    let mut skip_download = true;
     match fs::metadata(&archive_path) {
         Ok(_) if force_download.is_some() => remove_file(&archive_path)?,
-        Ok(_) => return Ok(()), //Short Circuit
+        Ok(_) => skip_download = false,
         Err(_) => (),
     };
 
@@ -463,7 +463,10 @@ fn get_source_archive(
         Consider modifying the get_external_resource function in build.rs since you are similar enough to an Arch Linux user :p"
         ),
     };
-    proc.spawn()?.wait()?;
+
+    if !skip_download {
+        proc.spawn()?.wait()?;
+    }
 
     // Extract the Archive
     let archive_file = match File::open(&archive_path) {
