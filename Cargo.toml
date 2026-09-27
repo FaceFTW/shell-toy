@@ -1,6 +1,6 @@
 [package]
 name = "shell-toy"
-version = "0.8.1"
+version = "0.9.0"
 edition = "2024"
 rust-version = "1.95"
 description = "A \"fortune | cowsay\" implementation in Rust, i.e. a nice little toy to liven up your shell."
@@ -13,15 +13,14 @@ name = "sh-toy"
 path = "src/main.rs"
 
 [dependencies]
-owo-colors = "4"
-winnow = "1.0"
-tinyrand = "0.5"
-getrandom = "0.4"
-argh = "0.1"
-textwrap = "0.16"
-strip-ansi-escapes = "0.2"
-unicode-width = "0.2"
-cfg-if = "1"
+owo-colors = "4.4.0"
+winnow = "1.0.4"
+tinyrand = "0.5.0"
+getrandom = "0.4.3"
+argh = "0.1.19"
+textwrap = "0.16.4"
+strip-ansi-escapes = "0.2.1"
+unicode-width = "0.2.2"
 
 [build-dependencies]
 proc-macro2 = "1"
