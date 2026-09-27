@@ -433,10 +433,10 @@ fn get_source_archive(
     check_dir_exists!(&resource_destination, clear_existing);
 
     //Short circuit if we aren't force-redownloading and the resource exists
-    let mut skip_download = true;
+    let mut skip_download = false;
     match fs::metadata(&archive_path) {
         Ok(_) if force_download.is_some() => remove_file(&archive_path)?,
-        Ok(_) => skip_download = false,
+        Ok(_) => skip_download = true,
         Err(_) => (),
     };
 
